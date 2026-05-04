@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorIconBackground">#000000</color>
+
+    <color name="p_app_background">#0B0B0B</color>
+    <color name="p_app_text_primary">#FFFFFF</color>
+    <color name="p_app_text_secondary">#AAAAAA</color>
+    <color name="p_app_dialog_bg">#151515</color>
+    <color name="p_app_accent">#5C94FF</color>
+    <color name="p_app_icon_tint">#FFFFFF</color>
+</resources>

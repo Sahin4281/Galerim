@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:id="@+id/settingsRoot"
+     android:layout_height="match_parent"
+     android:layout_width="match_parent"
+     android:background="@color/p_app_background"
+     android:orientation="vertical">
+
+    <LinearLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:gravity="center_vertical"
+         android:padding="16dp"
+         android:orientation="horizontal">
+
+        <ImageView
+             android:layout_height="28dp"
+             android:layout_width="28dp"
+             android:src="?attr/homeAsUpIndicator"
+             app:tint="@color/p_app_icon_tint"
+             android:id="@+id/btnBack" />
+
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             android:textSize="20sp"
+             android:textColor="@color/p_app_text_primary"
+             android:layout_marginStart="16dp"
+             android:text="Galeri Ayarları"
+             android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="wrap_content"
+         android:textSize="14sp"
+         android:textColor="@color/p_app_accent"
+         android:layout_marginTop="16dp"
+         android:layout_marginStart="16dp"
+         android:text="Görünüm"
+         android:textStyle="bold" />
+
+    <LinearLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:background="?android:attr/selectableItemBackground"
+         android:clickable="true"
+         android:padding="16dp"
+         android:focusable="true"
+         android:orientation="vertical"
+         android:id="@+id/layoutTheme">
+
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             android:textSize="16sp"
+             android:textColor="@color/p_app_text_primary"
+             android:text="Uygulama Teması" />
+
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             android:textSize="12sp"
+             android:textColor="@color/p_app_text_secondary"
+             android:layout_marginTop="4dp"
+             android:id="@+id/tvCurrentTheme"
+             android:text="Sistem Teması" />
+
+    </LinearLayout>
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="wrap_content"
+         android:textSize="14sp"
+         android:textColor="@color/p_app_accent"
+         android:layout_marginTop="16dp"
+         android:layout_marginStart="16dp"
+         android:text="Görüntüleme Seçenekleri"
+         android:textStyle="bold" />
+
+    <RelativeLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:padding="16dp">
+
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:layout_toStartOf="@id/switchAutoPlay"
+             android:orientation="vertical">
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:textSize="16sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:text="Videoları Otomatik Oynat" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:textSize="12sp"
+                 android:textColor="@color/p_app_text_secondary"
+                 android:layout_marginTop="4dp"
+                 android:text="Bu ayar açıksa, videolar tam ekranda otomatik başlatılır." />
+
+        </LinearLayout>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             android:layout_centerVertical="true"
+             android:layout_alignParentEnd="true"
+             android:id="@+id/switchAutoPlay" />
+
+    </RelativeLayout>
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="wrap_content"
+         android:textSize="14sp"
+         android:textColor="@color/p_app_accent"
+         android:layout_marginTop="16dp"
+         android:layout_marginStart="16dp"
+         android:text="Dosya Yönetimi"
+         android:textStyle="bold" />
+
+    <RelativeLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:padding="16dp">
+
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="match_parent"
+             android:layout_toStartOf="@id/switchTrash"
+             android:orientation="vertical">
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:textSize="16sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:text="Çöp Kutusuna Gönder" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:textSize="12sp"
+                 android:textColor="@color/p_app_text_secondary"
+                 android:layout_marginTop="4dp"
+                 android:text="Bu ayar açıksa, silinen fotoğraf ve videolar geri dönüşüm kutusuna gönderilir ve orada 30 gün boyunca saklanır." />
+
+        </LinearLayout>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             android:layout_centerVertical="true"
+             android:layout_alignParentEnd="true"
+             android:id="@+id/switchTrash" />
+
+    </RelativeLayout>
+
+    <TextView
+         android:layout_height="wrap_content"
+         android:layout_width="wrap_content"
+         android:textSize="14sp"
+         android:textColor="@color/p_app_accent"
+         android:layout_marginTop="16dp"
+         android:layout_marginStart="16dp"
+         android:text="Hakkında"
+         android:textStyle="bold" />
+
+    <LinearLayout
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:background="?android:attr/selectableItemBackground"
+         android:clickable="true"
+         android:padding="16dp"
+         android:focusable="true"
+         android:id="@+id/layoutAbout">
+
+        <TextView
+             android:layout_height="wrap_content"
+             android:layout_width="wrap_content"
+             android:textSize="16sp"
+             android:textColor="@color/p_app_text_primary"
+             android:text="Galerim Hakkında" />
+
+    </LinearLayout>
+
+</LinearLayout>

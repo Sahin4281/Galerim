@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_photos"
+        android:title="Fotoğraflar" />
+    <item
+        android:id="@+id/nav_albums"
+        android:title="Albümler" />
+    <item
+        android:id="@+id/nav_more"
+        android:title="Daha fazla" />
+</menu>
