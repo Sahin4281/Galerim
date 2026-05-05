@@ -373,7 +373,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.btnTrashMore)?.setOnClickListener { showTrashMoreMenu(it) }
-        findViewById<View>(R.id.btnMainMore)?.setOnClickListener { showMainMoreMenu(it) }
         
         setupElegantBottomTabs()
         setupSelectionButtons()
@@ -546,6 +545,17 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
         } 
+    }
+
+    val bgImagePickerLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let {
+            try {
+                contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (e: Throwable) {}
+            val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("bg_type", "image").putString("bg_image", it.toString()).apply()
+            applyDynamicColorsToUI()
+        }
     }
 
     private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->

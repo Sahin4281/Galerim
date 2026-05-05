@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -29,10 +30,119 @@ fun MainActivity.applyDynamicColorsToUI() {
     
     val actualBg = if (activity.isAmoledTheme) Color.BLACK else bgColor
     
-    activity.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0)?.setBackgroundColor(actualBg)
+    val rootView = activity.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0)
+    val bgType = prefs.getString("bg_type", "default")
     
-    val appBar = activity.findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBarLayout)
-    appBar?.setBackgroundColor(actualBg)
+    var isDarkBg = true
+    
+    if (bgType == "color") {
+        val customColor = prefs.getInt("bg_color", actualBg)
+        rootView?.setBackgroundColor(customColor)
+        
+        // Rengin parlaklık analizi
+        val r = Color.red(customColor)
+        val g = Color.green(customColor)
+        val b = Color.blue(customColor)
+        isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
+    } else if (bgType == "image") {
+        val imageUriStr = prefs.getString("bg_image", null)
+        var bgSet = false
+        if (imageUriStr != null) {
+            try {
+                val uri = Uri.parse(imageUriStr)
+                
+                val optionsBounds = android.graphics.BitmapFactory.Options()
+                optionsBounds.inJustDecodeBounds = true
+                activity.contentResolver.openInputStream(uri)?.use { 
+                    android.graphics.BitmapFactory.decodeStream(it, null, optionsBounds)
+                }
+
+                var scale = 1
+                val screenWidth = activity.resources.displayMetrics.widthPixels
+                val screenHeight = activity.resources.displayMetrics.heightPixels
+                
+                val maxDim = Math.max(optionsBounds.outWidth, optionsBounds.outHeight)
+                val reqDim = Math.max(screenWidth, screenHeight)
+                
+                while (maxDim / scale / 2 >= reqDim) {
+                    scale *= 2
+                }
+
+                val optionsDecode = android.graphics.BitmapFactory.Options()
+                optionsDecode.inSampleSize = scale
+                val bitmap = activity.contentResolver.openInputStream(uri)?.use {
+                    android.graphics.BitmapFactory.decodeStream(it, null, optionsDecode)
+                }
+
+                if (bitmap != null) {
+                    // EXIF Döndürme (Rotation) Kontrolü
+                    var rotationDegrees = 0f
+                    try {
+                        activity.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                val exif = android.media.ExifInterface(inputStream)
+                                val orientation = exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
+                                rotationDegrees = when (orientation) {
+                                    android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                                    android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                                    android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                                    else -> 0f
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {}
+
+                    var rotatedBitmap = bitmap
+                    if (rotationDegrees != 0f) {
+                        val matrix = android.graphics.Matrix()
+                        matrix.postRotate(rotationDegrees)
+                        rotatedBitmap = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                    }
+
+                    // SÜNMEYİ ÖNLEME: Center Crop işlemi (Doğru açıya çevrilmiş resim üzerinden)
+                    val bgScale = Math.max(screenWidth.toFloat() / rotatedBitmap.width, screenHeight.toFloat() / rotatedBitmap.height)
+                    val scaledWidth = Math.round(bgScale * rotatedBitmap.width)
+                    val scaledHeight = Math.round(bgScale * rotatedBitmap.height)
+                    
+                    val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(rotatedBitmap, scaledWidth, scaledHeight, true)
+                    val x = Math.max(0, (scaledBitmap.width - screenWidth) / 2)
+                    val y = Math.max(0, (scaledBitmap.height - screenHeight) / 2)
+                    
+                    val finalBitmap = android.graphics.Bitmap.createBitmap(scaledBitmap, x, y, Math.min(screenWidth, scaledBitmap.width), Math.min(screenHeight, scaledBitmap.height))
+                    
+                    val drawable = android.graphics.drawable.BitmapDrawable(activity.resources, finalBitmap)
+                    rootView?.background = drawable
+                    bgSet = true
+                    
+                    // RESMİN PARLAKLIK ANALİZİ
+                    val pBmp = android.graphics.Bitmap.createScaledBitmap(finalBitmap, 1, 1, true)
+                    val avgColor = pBmp.getPixel(0, 0)
+                    val r = Color.red(avgColor)
+                    val g = Color.green(avgColor)
+                    val b = Color.blue(avgColor)
+                    isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
+                }
+            } catch (e: Throwable) { 
+            }
+        }
+        if (!bgSet) {
+            rootView?.setBackgroundColor(actualBg)
+            val r = Color.red(actualBg)
+            val g = Color.green(actualBg)
+            val b = Color.blue(actualBg)
+            isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
+        }
+    } else {
+        rootView?.setBackgroundColor(actualBg)
+        val r = Color.red(actualBg)
+        val g = Color.green(actualBg)
+        val b = Color.blue(actualBg)
+        isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
+    }
+    
+    // Adaptif yazı rengi (Arka plan açıksa SİYAH, koyuysa BEYAZ)
+    val adaptiveTextColor = if (isDarkBg) Color.WHITE else Color.BLACK
+    prefs.edit().putInt("dynamic_text_color", adaptiveTextColor).apply()
     
     activity.findViewById<View>(R.id.searchContainer)?.setBackgroundColor(actualBg)
     
@@ -56,8 +166,6 @@ fun MainActivity.applyDynamicColorsToUI() {
     val isAccentWhite = accentColor == Color.WHITE || accentColor == Color.parseColor("#FFFFFF")
     activity.fastScrollBubble.setTextColor(if (isAccentWhite) Color.BLACK else Color.WHITE)
     
-    activity.findViewById<ImageView>(R.id.btnMainSearch)?.setColorFilter(iconTint)
-    activity.findViewById<ImageView>(R.id.btnMainMore)?.setColorFilter(iconTint)
     activity.findViewById<ImageView>(R.id.btnSearchBack)?.setColorFilter(iconTint)
     activity.findViewById<ImageView>(R.id.btnClearSearch)?.setColorFilter(iconTint)
     
@@ -89,42 +197,48 @@ fun MainActivity.applyDynamicColorsToUI() {
     activity.findViewById<TextView>(R.id.btnTrashEdit)?.setTextColor(primaryColor)
     activity.findViewById<ImageView>(R.id.btnTrashMore)?.setColorFilter(iconTint)
     
-    (activity.emptyTrashView as? LinearLayout)?.getChildAt(0)?.let { 
-        if (it is TextView) {
-            it.setTextColor(primaryColor)
+    // Boş Sayfalardaki yazıların Akıllı Renk Analizi ile değiştirilmesi
+    (activity.emptyTrashView as? LinearLayout)?.let { layout ->
+        for (i in 0 until layout.childCount) {
+            val child = layout.getChildAt(i)
+            if (child is TextView) child.setTextColor(adaptiveTextColor)
         }
     }
     
-    (activity.emptyFavoritesView as? LinearLayout)?.getChildAt(0)?.let { 
-        if (it is TextView) {
-            it.setTextColor(primaryColor)
+    (activity.emptyFavoritesView as? LinearLayout)?.let { layout ->
+        for (i in 0 until layout.childCount) {
+            val child = layout.getChildAt(i)
+            if (child is TextView) child.setTextColor(adaptiveTextColor)
         }
     }
     
-    (activity.emptySearchView as? LinearLayout)?.getChildAt(0)?.let { 
-        if (it is TextView) {
-            it.setTextColor(primaryColor)
+    (activity.emptySearchView as? LinearLayout)?.let { layout ->
+        for (i in 0 until layout.childCount) {
+            val child = layout.getChildAt(i)
+            if (child is TextView) child.setTextColor(adaptiveTextColor)
         }
     }
     
     val ivSelectAll = activity.findViewById<ImageView>(R.id.ivSelectAllIcon)
     if (activity.selectedMedia.size == MainActivity.displayedMediaList.size && MainActivity.displayedMediaList.isNotEmpty()) {
-        ivSelectAll.setImageDrawable(CheckCircleDrawable(accentColor))
-        ivSelectAll.imageTintList = null
+        ivSelectAll?.setImageDrawable(CheckCircleDrawable(accentColor))
+        ivSelectAll?.imageTintList = null
     } else {
-        ivSelectAll.setImageResource(R.drawable.ic_check_circle_off)
-        ivSelectAll.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
+        ivSelectAll?.setImageResource(R.drawable.ic_check_circle_off)
+        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
     }
+    
+    // Adaptörleri anında güncelleyerek tarih başlıklarının renklerini aktifleştiriyoruz
+    activity.allRecycler.adapter?.notifyDataSetChanged()
+    activity.albumsRecycler.adapter?.notifyDataSetChanged()
 }
 
 fun MainActivity.updateEmptyStateUI() {
     val activity = this
-    val appBarLayout = activity.findViewById<View>(R.id.appBarLayout)
     val coordinatorLayout = activity.findViewById<View>(R.id.coordinatorLayout)
     
     if (activity.isShowingTrash) {
-        appBarLayout?.visibility = View.GONE
-        coordinatorLayout.visibility = View.GONE
+        coordinatorLayout?.visibility = View.GONE
         activity.albumsRecycler.visibility = View.GONE
         activity.fastScrollContainer.visibility = View.GONE
         activity.trashTopBar.visibility = View.VISIBLE
@@ -153,15 +267,14 @@ fun MainActivity.updateEmptyStateUI() {
             tvTrashTitleCount?.visibility = View.VISIBLE
             tvTrashTitleCount?.text = "${MainActivity.trashList.size} görüntü"
             activity.emptyTrashView.visibility = View.GONE
-            coordinatorLayout.visibility = View.VISIBLE
+            coordinatorLayout?.visibility = View.VISIBLE
             activity.allRecycler.visibility = View.VISIBLE
             btnTrashEdit?.visibility = View.VISIBLE
             btnTrashMore?.visibility = View.VISIBLE
         }
         
     } else if (activity.isShowingFavorites) {
-        appBarLayout?.visibility = View.GONE
-        coordinatorLayout.visibility = View.GONE
+        coordinatorLayout?.visibility = View.GONE
         activity.albumsRecycler.visibility = View.GONE
         activity.fastScrollContainer.visibility = View.GONE
         activity.trashTopBar.visibility = View.GONE
@@ -181,7 +294,7 @@ fun MainActivity.updateEmptyStateUI() {
             activity.allRecycler.visibility = View.GONE
         } else {
             activity.emptyFavoritesView.visibility = View.GONE
-            coordinatorLayout.visibility = View.VISIBLE
+            coordinatorLayout?.visibility = View.VISIBLE
             activity.allRecycler.visibility = View.VISIBLE
         }
         
@@ -205,8 +318,7 @@ fun MainActivity.updateEmptyStateUI() {
         }
         
     } else {
-        appBarLayout?.visibility = View.VISIBLE
-        coordinatorLayout.visibility = View.VISIBLE
+        coordinatorLayout?.visibility = View.VISIBLE
         
         activity.fastScrollContainer.visibility = if (activity.bottomTabLayout.selectedTabPosition == 2) {
             View.GONE 
@@ -281,11 +393,11 @@ fun MainActivity.updateSelectionUI() {
 
     val ivSelectAll = activity.findViewById<ImageView>(R.id.ivSelectAllIcon)
     if (activity.selectedMedia.size == MainActivity.displayedMediaList.size && MainActivity.displayedMediaList.isNotEmpty()) {
-        ivSelectAll.setImageDrawable(CheckCircleDrawable(activity.getAccentColor()))
-        ivSelectAll.imageTintList = null
+        ivSelectAll?.setImageDrawable(CheckCircleDrawable(activity.getAccentColor()))
+        ivSelectAll?.imageTintList = null
     } else {
-        ivSelectAll.setImageResource(R.drawable.ic_check_circle_off)
-        ivSelectAll.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
+        ivSelectAll?.setImageResource(R.drawable.ic_check_circle_off)
+        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
     }
 }
 

@@ -1,5 +1,6 @@
 package com.sahin.galerim
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Matrix
@@ -22,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
-
 
 class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     
@@ -60,12 +60,17 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
         val accentColor = activity.getAccentColor()
         val iconTint = ContextCompat.getColor(activity, R.color.p_app_icon_tint)
         
+        // Akıllı Luminance (Parlaklık) Analizinden Gelen Yazı Rengini Çekiyoruz
+        val adaptiveTextColor = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+            .getInt("dynamic_text_color", ContextCompat.getColor(activity, R.color.p_app_text_primary))
+        
         if (holder is HeaderViewHolder && item is HeaderItem) {
             holder.title.text = item.title
-            holder.title.setTextColor(ContextCompat.getColor(activity, R.color.p_app_text_primary))
+            holder.title.setTextColor(adaptiveTextColor) // UYARLANMIŞ RENK EKLENDİ
             
             if (item.location != null) {
                 holder.location.text = item.location
+                holder.location.setTextColor(adaptiveTextColor) // UYARLANMIŞ RENK EKLENDİ
                 holder.location.visibility = View.VISIBLE
             } else {
                 holder.location.visibility = View.GONE
@@ -323,7 +328,7 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                 true 
             }
             
-                        holder.itemView.setOnClickListener { 
+            holder.itemView.setOnClickListener { 
                 if (activity.isSelectionMode) { 
                     if (activity.selectedMedia.contains(m)) { 
                         activity.selectedMedia.remove(m)
@@ -332,7 +337,6 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                         } else { 
                             activity.updateSelectionUI()
                             notifyItemChanged(pos) 
-                            // Üstündeki tarih başlığını bul ve onu da anında güncelle
                             for (i in pos downTo 0) {
                                 if (MainActivity.galleryItems[i] is HeaderItem) {
                                     notifyItemChanged(i)
@@ -344,7 +348,6 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                         activity.selectedMedia.add(m)
                         activity.updateSelectionUI()
                         notifyItemChanged(pos) 
-                        // Üstündeki tarih başlığını bul ve onu da anında güncelle
                         for (i in pos downTo 0) {
                             if (MainActivity.galleryItems[i] is HeaderItem) {
                                 notifyItemChanged(i)
@@ -392,6 +395,11 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
     
     override fun onBindViewHolder(h: ViewHolder, pos: Int) { 
         val a = activity.albumList[pos]
+        
+        // Akıllı Luminance (Parlaklık) Analizinden Gelen Yazı Rengini Çekiyoruz
+        val adaptiveTextColor = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+            .getInt("dynamic_text_color", ContextCompat.getColor(activity, R.color.p_app_text_primary))
+
         Glide.with(activity)
             .asBitmap()
             .load(a.thumbnail)
@@ -400,7 +408,7 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
             .into(h.thumb)
         
         h.name.text = "${a.name}\n${a.count}"
-        h.name.setTextColor(ContextCompat.getColor(activity, R.color.p_app_text_primary))
+        h.name.setTextColor(adaptiveTextColor) // UYARLANMIŞ RENK EKLENDİ
         
         h.itemView.setOnClickListener { 
             activity.albumsRecycler.stopScroll()

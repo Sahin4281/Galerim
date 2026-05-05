@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -106,7 +107,6 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     view.findViewById<View>(R.id.menu_item_places)?.setOnClickListener {
         resetStates()
         isShowingPlaces = true
-        mainTitle.text = "Yerler"
         bottomSheetMenu?.dismiss()
         allRecycler.visibility = View.VISIBLE
         albumsRecycler.visibility = View.GONE
@@ -116,7 +116,6 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     view.findViewById<View>(R.id.menu_item_locations)?.setOnClickListener {
         resetStates()
         isShowingLocations = true
-        mainTitle.text = "Konumlar"
         bottomSheetMenu?.dismiss()
         allRecycler.visibility = View.GONE
         albumsRecycler.visibility = View.VISIBLE
@@ -157,6 +156,29 @@ fun MainActivity.showGalleryMenuBottomSheet() {
                 Toast.makeText(this, "Güvenlik Doğrulanamadı: $hata", Toast.LENGTH_SHORT).show()
             }
         )
+    }
+
+    view.findViewById<View>(R.id.menu_item_search)?.setOnClickListener {
+        resetStates()
+        bottomSheetMenu?.dismiss()
+        isSearchMode = true
+        searchContainer.visibility = View.VISIBLE
+        etSearch.requestFocus()
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(etSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        allRecycler.visibility = View.VISIBLE
+        albumsRecycler.visibility = View.GONE
+        loadDisplayedList()
+    }
+
+    view.findViewById<View>(R.id.menu_item_sort)?.setOnClickListener {
+        bottomSheetMenu?.dismiss()
+        showSortBottomSheet()
+    }
+
+    view.findViewById<View>(R.id.menu_item_appearance)?.setOnClickListener {
+        bottomSheetMenu?.dismiss()
+        showAppearanceBottomSheet()
     }
 
     bottomSheetMenu?.setOnDismissListener {
@@ -401,6 +423,140 @@ fun MainActivity.showAppearanceBottomSheet() {
     layout.addView(gridLayout)
 
     layout.addView(TextView(this).apply {
+        text = "Arka Plan"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        setTypeface(null, android.graphics.Typeface.BOLD)
+        setPadding(64, 24, 0, 24)
+    })
+
+    val bgScroll = android.widget.HorizontalScrollView(this).apply {
+        isHorizontalScrollBarEnabled = false
+    }
+
+    val bgLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(48, 0, 48, 48)
+    }
+
+    val bgOptions = listOf(
+        "#000000",
+        "#1E1E1E",
+        "#F5F5F5",
+        "#FFE4B5",
+        "#E6E6FA"
+    )
+
+    val currentBgType = prefs.getString("bg_type", "default")
+    val currentBgColor = prefs.getInt("bg_color", Color.BLACK)
+
+    val bgFrames = mutableListOf<Pair<String, FrameLayout>>()
+
+    bgOptions.forEach { hex ->
+        val cVal = Color.parseColor(hex)
+        val frame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(110, 110).apply {
+                setMargins(12, 0, 12, 0)
+            }
+        }
+        val circle = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(cVal)
+                if (hex == "#F5F5F5" || hex == "#FFE4B5" || hex == "#E6E6FA") {
+                    setStroke(2, Color.LTGRAY)
+                }
+            }
+            layoutParams = FrameLayout.LayoutParams(80, 80, Gravity.CENTER)
+        }
+
+        if (currentBgType == "color" && currentBgColor == cVal) {
+            frame.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setStroke(6, accentColor)
+            }
+        }
+
+        frame.setOnClickListener {
+            prefs.edit().putString("bg_type", "color").putInt("bg_color", cVal).apply()
+            
+            bgFrames.forEach { (h, f) ->
+                if (h == hex) {
+                    f.background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setStroke(6, accentColor)
+                    }
+                } else {
+                    f.background = null
+                }
+            }
+            applyDynamicColorsToUI()
+        }
+
+        frame.addView(circle)
+        bgFrames.add(Pair(hex, frame))
+        bgLayout.addView(frame)
+    }
+
+    val pickerFrame = FrameLayout(this).apply {
+        layoutParams = LinearLayout.LayoutParams(110, 110).apply { setMargins(12, 0, 12, 0) }
+    }
+    val pickerCircle = ImageView(this).apply {
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)).apply {
+            shape = GradientDrawable.OVAL
+        }
+        layoutParams = FrameLayout.LayoutParams(80, 80, Gravity.CENTER)
+    }
+    pickerFrame.setOnClickListener {
+        showColorPickerDialog { selectedColor ->
+            prefs.edit().putString("bg_type", "color").putInt("bg_color", selectedColor).apply()
+            bgFrames.forEach { (_, f) -> f.background = null }
+            pickerFrame.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setStroke(6, accentColor)
+            }
+            applyDynamicColorsToUI()
+        }
+    }
+    if (currentBgType == "color" && !bgOptions.map{Color.parseColor(it)}.contains(currentBgColor)) {
+        pickerFrame.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setStroke(6, accentColor)
+        }
+    }
+    pickerFrame.addView(pickerCircle)
+    bgLayout.addView(pickerFrame)
+
+    val galleryFrame = FrameLayout(this).apply {
+        layoutParams = LinearLayout.LayoutParams(110, 110).apply { setMargins(12, 0, 12, 0) }
+    }
+    val galleryCircle = ImageView(this).apply {
+        setImageResource(android.R.drawable.ic_menu_gallery)
+        setColorFilter(Color.WHITE)
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.DKGRAY)
+        }
+        setPadding(16, 16, 16, 16)
+        layoutParams = FrameLayout.LayoutParams(80, 80, Gravity.CENTER)
+    }
+    galleryFrame.setOnClickListener {
+        appearanceBottomSheetMenu?.dismiss()
+        this@showAppearanceBottomSheet.bgImagePickerLauncher.launch(arrayOf("image/*"))
+    }
+    if (currentBgType == "image") {
+        galleryFrame.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setStroke(6, accentColor)
+        }
+    }
+    galleryFrame.addView(galleryCircle)
+    bgLayout.addView(galleryFrame)
+
+    bgScroll.addView(bgLayout)
+    layout.addView(bgScroll)
+
+    layout.addView(TextView(this).apply {
         text = "Vurgu Rengi"
         setTextColor(Color.parseColor("#888888"))
         textSize = 14f
@@ -504,4 +660,94 @@ fun MainActivity.showAppearanceBottomSheet() {
     appearanceBottomSheetMenu?.setContentView(layout)
     appearanceBottomSheetMenu?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
     appearanceBottomSheetMenu?.show()
+}
+
+fun MainActivity.showColorPickerDialog(onColorSelected: (Int) -> Unit) {
+    val dialog = BottomSheetDialog(this)
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(48, 48, 48, 48)
+        background = GradientDrawable().apply {
+            setColor(getMenuBgColor())
+            cornerRadii = floatArrayOf(60f, 60f, 60f, 60f, 0f, 0f, 0f, 0f)
+        }
+    }
+    
+    layout.addView(TextView(this).apply {
+        text = "Renk Seçici"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 32)
+    })
+    
+    val spectrumView = ImageView(this).apply {
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 400)
+        
+        val bmp = android.graphics.Bitmap.createBitmap(256, 256, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint()
+        val shader = android.graphics.LinearGradient(0f, 0f, 256f, 0f, 
+            intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA, Color.RED), 
+            null, android.graphics.Shader.TileMode.CLAMP)
+        paint.shader = shader
+        canvas.drawRect(0f, 0f, 256f, 256f, paint)
+        
+        val shaderDark = android.graphics.LinearGradient(0f, 0f, 0f, 256f, 
+            Color.WHITE, Color.BLACK, android.graphics.Shader.TileMode.CLAMP)
+        val paintDark = android.graphics.Paint().apply {
+            this.shader = shaderDark
+            xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.MULTIPLY)
+        }
+        canvas.drawRect(0f, 0f, 256f, 256f, paintDark)
+        
+        setImageBitmap(bmp)
+        scaleType = ImageView.ScaleType.FIT_XY
+    }
+    
+    val previewColor = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 100).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(Color.WHITE)
+            cornerRadius = 20f
+        }
+    }
+    
+    var selectedColor = Color.WHITE
+    
+    spectrumView.setOnTouchListener { v, event ->
+        if (event.action == android.view.MotionEvent.ACTION_DOWN || event.action == android.view.MotionEvent.ACTION_MOVE) {
+            val bmp = (v as ImageView).drawable.let { it as android.graphics.drawable.BitmapDrawable }.bitmap
+            var x = (event.x * bmp.width / v.width).toInt()
+            var y = (event.y * bmp.height / v.height).toInt()
+            x = x.coerceIn(0, bmp.width - 1)
+            y = y.coerceIn(0, bmp.height - 1)
+            
+            selectedColor = bmp.getPixel(x, y)
+            (previewColor.background as GradientDrawable).setColor(selectedColor)
+        }
+        true
+    }
+    
+    layout.addView(spectrumView)
+    layout.addView(previewColor)
+    
+    val btnApply = AppCompatButton(this).apply {
+        text = "Uygula"
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(getAccentColor())
+            cornerRadius = 30f
+        }
+        setTextColor(Color.WHITE)
+        setOnClickListener {
+            onColorSelected(selectedColor)
+            dialog.dismiss()
+        }
+    }
+    layout.addView(btnApply)
+    
+    dialog.setContentView(layout)
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    dialog.show()
 }

@@ -15,19 +15,6 @@ import java.util.Calendar
 import java.util.Locale
 
 fun MainActivity.setupSearchFunctionality() {
-    findViewById<View>(R.id.btnMainSearch)?.setOnClickListener {
-        isSearchMode = true
-        topIconsContainer.visibility = View.GONE
-        searchContainer.visibility = View.VISIBLE
-        etSearch.requestFocus()
-        
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(etSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-        
-        albumsRecycler.visibility = View.GONE
-        allRecycler.visibility = View.VISIBLE
-        loadDisplayedList()
-    }
     
     btnSearchBack.setOnClickListener {
         closeSearchMode()
@@ -272,10 +259,6 @@ fun MainActivity.setupElegantBottomTabs() {
             
             if (isSearchMode) {
                 closeSearchMode()
-            }
-            
-            if (tab.position != 3) {
-                mainTitle.text = tabNames[tab.position]
             }
             
             when (tab.position) {

@@ -1,218 +1,331 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="@drawable/bg_bottom_sheet"
-    android:orientation="vertical"
-    android:paddingTop="32dp"
-    android:paddingBottom="32dp">
+<LinearLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:layout_height="wrap_content"
+     android:layout_width="match_parent"
+     android:background="@drawable/bg_bottom_sheet"
+     android:orientation="vertical"
+     android:paddingBottom="28dp"
+     android:paddingTop="28dp">
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false"
-        android:layout_marginBottom="24dp"
-        android:weightSum="4">
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:layout_marginBottom="24dp"
+         android:weightSum="5"
+         android:orientation="horizontal"
+         android:baselineAligned="false">
 
         <LinearLayout
-            android:id="@+id/menu_item_settings"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_settings">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@drawable/ic_menu_settings" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_menu_settings"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Ayarlar"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Ayarlar" />
+
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/menu_item_places"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_places">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@drawable/ic_menu_places" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_menu_places"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Yerler"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Yerler" />
+
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/menu_item_locations"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_locations">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@drawable/ic_menu_locations" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_menu_locations"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Konumlar"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Konumlar" />
+
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/menu_item_favorites"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_favorites">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@drawable/ic_menu_favorites" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_menu_favorites"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Favoriler"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Favoriler" />
+
         </LinearLayout>
+
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_trash">
+
+            <ImageView
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_menu_trash"
+                 app:tint="@color/p_app_icon_tint" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Çöp Kutusu" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false"
-        android:weightSum="4">
+         android:layout_height="wrap_content"
+         android:layout_width="match_parent"
+         android:weightSum="5"
+         android:orientation="horizontal"
+         android:baselineAligned="false">
 
         <LinearLayout
-            android:id="@+id/menu_item_trash"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_hidden">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@drawable/ic_menu_trash" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@android:drawable/ic_secure"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Çöp Kutusu"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Gizli Klasör" />
+
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/menu_item_hidden"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_fix_dates">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@android:drawable/ic_secure" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@android:drawable/ic_popup_sync"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Gizli Klasör"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Tarihleri Düzelt" />
+
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/menu_item_fix_dates"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_search">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                app:tint="@color/p_app_icon_tint"
-                android:src="@android:drawable/ic_popup_sync" />
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_search_custom"
+                 app:tint="@color/p_app_icon_tint" />
+
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Tarihleri düzelt"
-                android:textColor="@color/p_app_text_primary"
-                android:textSize="12sp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Arama" />
+
         </LinearLayout>
+
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_sort">
+
+            <ImageView
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@android:drawable/ic_menu_sort_by_size"
+                 app:tint="@color/p_app_icon_tint" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Sırala" />
+
+        </LinearLayout>
+
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_appearance">
+
+            <ImageView
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@android:drawable/ic_menu_gallery"
+                 app:tint="@color/p_app_icon_tint" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Görünüm" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
 </LinearLayout>

@@ -24,56 +24,17 @@
                 android:layout_height="wrap_content"
                 app:layout_scrollFlags="scroll|enterAlways">
 
+                <TextView
+                    android:id="@+id/mainTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+
                 <LinearLayout
                     android:id="@+id/topIconsContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="?attr/actionBarSize"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    app:layout_collapseMode="pin">
-
-                    <TextView
-                        android:id="@+id/mainTitle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Fotoğraflar"
-                        android:textSize="26sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/p_app_text_primary"
-                        android:paddingStart="16dp" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingEnd="8dp">
-
-                        <ImageView
-                            android:id="@+id/btnMainSearch"
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
-                            android:padding="10dp"
-                            android:src="@drawable/ic_search_custom"
-                            app:tint="@color/p_app_icon_tint"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:focusable="true"/>
-
-                        <ImageView
-                            android:id="@+id/btnMainMore"
-                            android:layout_width="44dp"
-                            android:layout_height="44dp"
-                            android:padding="10dp"
-                            android:src="@drawable/ic_action_more"
-                            app:tint="@color/p_app_icon_tint"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:focusable="true"/>
-                    </LinearLayout>
-                </LinearLayout>
-
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
                 <LinearLayout
                     android:id="@+id/searchContainer"
                     android:layout_width="match_parent"
