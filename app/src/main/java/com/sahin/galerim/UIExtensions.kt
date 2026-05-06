@@ -147,6 +147,19 @@ fun MainActivity.applyDynamicColorsToUI() {
     activity.selectionBottomBar.setBackgroundColor(actualBg)
     activity.bottomTabLayout.setBackgroundColor(actualBg)
     
+    // Yeni eklediğimiz başlıkların renk ayarları
+    activity.mainTitle.setTextColor(adaptiveTextColor)
+    activity.findViewById<TextView>(R.id.subTitle)?.setTextColor(secondaryColor)
+    
+    (activity.topIconsContainer as? ViewGroup)?.let { container ->
+        for (i in 0 until container.childCount) {
+            val child = container.getChildAt(i)
+            if (child is ImageView) {
+                child.setColorFilter(iconTint)
+            }
+        }
+    }
+    
     activity.tvSelectionCount.setTextColor(primaryColor)
     activity.findViewById<ImageView>(R.id.btnCloseSelection)?.setColorFilter(iconTint)
     
@@ -396,9 +409,22 @@ fun MainActivity.updateSelectionUI() {
 
 fun MainActivity.resetStates() { 
     val activity = this
-    // NOKTA ATIŞI: Sekme geri yüklenirken state'lerin sıfırlanmasını (kıpraşmayı ve albümden atmayı) engeller.
     if (activity.bottomTabLayout.tag == "restoring") return
     
+    // Geri çıkıldığında yeni XML başlığının kusursuz kapanması için
+    activity.findViewById<LinearLayout>(R.id.albumStickyHeader)?.visibility = View.GONE
+    activity.mainTitle.visibility = View.GONE
+    activity.topIconsContainer.visibility = View.GONE
+    (activity.topIconsContainer as? ViewGroup)?.removeAllViews()
+    
+    val appBar = activity.findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBarLayout)
+    val collapsingToolbar = appBar?.getChildAt(0) as? com.google.android.material.appbar.CollapsingToolbarLayout
+    val params = collapsingToolbar?.layoutParams as? com.google.android.material.appbar.AppBarLayout.LayoutParams
+    if (params != null) {
+        params.scrollFlags = com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL or com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_ENTER_ALWAYS
+        collapsingToolbar.layoutParams = params
+    }
+
     activity.isShowingTrash = false
     activity.isShowingFavorites = false
     activity.isShowingPlaces = false
@@ -556,9 +582,11 @@ fun MainActivity.updateGridSpanCount(count: Int) {
     val activity = this
     val lmAll = activity.allRecycler.layoutManager as? GridLayoutManager
     lmAll?.spanCount = count
+    
     lmAll?.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
         override fun getSpanSize(position: Int): Int {
-            return if (MainActivity.galleryItems.getOrNull(position) is HeaderItem) count else 1
+            val item = MainActivity.galleryItems.getOrNull(position)
+            return if (item is HeaderItem) count else 1
         }
     }
     

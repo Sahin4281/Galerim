@@ -1,0 +1,35 @@
+{
+  "allFiles": [
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/ActionExtensions.kt",
+      "selection": {
+        "end": {
+          "column": 0,
+          "index": 25761,
+          "line": 600
+        },
+        "start": {
+          "column": 0,
+          "index": 25761,
+          "line": 600
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/FullScreenExtensions.kt",
+      "selection": {
+        "end": {
+          "column": 0,
+          "index": 51464,
+          "line": 1197
+        },
+        "start": {
+          "column": 0,
+          "index": 51464,
+          "line": 1197
+        }
+      }
+    }
+  ],
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/FullScreenExtensions.kt"
+}

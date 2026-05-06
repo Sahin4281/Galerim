@@ -278,9 +278,15 @@ fun MainActivity.setupElegantBottomTabs() {
                 2 -> { 
                     resetStates()
                     fastScrollContainer.visibility = View.GONE
-                    buildAlbums()
-                    allRecycler.visibility = View.GONE
-                    albumsRecycler.visibility = View.VISIBLE 
+                    
+                    if (bottomTabLayout.tag == "restoring" && (filterBucketId != null || filterLocation != null || isSearchMode)) {
+                        allRecycler.visibility = View.VISIBLE
+                        albumsRecycler.visibility = View.GONE
+                    } else {
+                        buildAlbums()
+                        allRecycler.visibility = View.GONE
+                        albumsRecycler.visibility = View.VISIBLE 
+                    }
                 }
                 3 -> {
                     showGalleryMenuBottomSheet()

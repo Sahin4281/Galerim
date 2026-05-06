@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -27,14 +28,17 @@ import androidx.lifecycle.lifecycleScope
 class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     
     override fun getItemViewType(pos: Int): Int {
-        return if (MainActivity.galleryItems[pos] is HeaderItem) 0 else 1
+        return when (MainActivity.galleryItems.getOrNull(pos)) {
+            is HeaderItem -> 0
+            is MediaContentItem -> 1
+            else -> 1
+        }
     }
     
     override fun onCreateViewHolder(p: ViewGroup, t: Int): RecyclerView.ViewHolder {
-        return if (t == 0) {
-            HeaderViewHolder(activity.layoutInflater.inflate(R.layout.item_gallery_header, p, false)) 
-        } else {
-            MediaViewHolder(activity.layoutInflater.inflate(R.layout.item_media, p, false))
+        return when (t) {
+            0 -> HeaderViewHolder(activity.layoutInflater.inflate(R.layout.item_gallery_header, p, false)) 
+            else -> MediaViewHolder(activity.layoutInflater.inflate(R.layout.item_media, p, false))
         }
     }
     
@@ -56,21 +60,20 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, pos: Int) {
-        val item = MainActivity.galleryItems[pos]
+        val item = MainActivity.galleryItems.getOrNull(pos) ?: return
         val accentColor = activity.getAccentColor()
         val iconTint = ContextCompat.getColor(activity, R.color.p_app_icon_tint)
         
-        // Akıllı Luminance (Parlaklık) Analizinden Gelen Yazı Rengini Çekiyoruz
         val adaptiveTextColor = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
             .getInt("dynamic_text_color", ContextCompat.getColor(activity, R.color.p_app_text_primary))
         
         if (holder is HeaderViewHolder && item is HeaderItem) {
             holder.title.text = item.title
-            holder.title.setTextColor(adaptiveTextColor) // UYARLANMIŞ RENK EKLENDİ
+            holder.title.setTextColor(adaptiveTextColor) 
             
             if (item.location != null) {
                 holder.location.text = item.location
-                holder.location.setTextColor(adaptiveTextColor) // UYARLANMIŞ RENK EKLENDİ
+                holder.location.setTextColor(adaptiveTextColor) 
                 holder.location.visibility = View.VISIBLE
             } else {
                 holder.location.visibility = View.GONE
@@ -79,8 +82,8 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
             val itemsUnderHeader = mutableListOf<MediaItem>()
             
             for (i in pos + 1 until MainActivity.galleryItems.size) {
-                val nextItem = MainActivity.galleryItems[i]
-                if (nextItem is HeaderItem) break
+                val nextItem = MainActivity.galleryItems.getOrNull(i)
+                if (nextItem == null || nextItem is HeaderItem) break
                 if (nextItem is MediaContentItem) {
                     itemsUnderHeader.add(nextItem.media)
                 }
@@ -338,7 +341,8 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                             activity.updateSelectionUI()
                             notifyItemChanged(pos) 
                             for (i in pos downTo 0) {
-                                if (MainActivity.galleryItems[i] is HeaderItem) {
+                                val previousItem = MainActivity.galleryItems.getOrNull(i)
+                                if (previousItem is HeaderItem) {
                                     notifyItemChanged(i)
                                     break
                                 }
@@ -349,7 +353,8 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                         activity.updateSelectionUI()
                         notifyItemChanged(pos) 
                         for (i in pos downTo 0) {
-                            if (MainActivity.galleryItems[i] is HeaderItem) {
+                            val previousItem = MainActivity.galleryItems.getOrNull(i)
+                            if (previousItem is HeaderItem) {
                                 notifyItemChanged(i)
                                 break
                             }
@@ -394,38 +399,100 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
     )
     
     override fun onBindViewHolder(h: ViewHolder, pos: Int) { 
-        val a = activity.albumList[pos]
+        val a = activity.albumList.getOrNull(pos) ?: return
         
-        // Akıllı Luminance (Parlaklık) Analizinden Gelen Yazı Rengini Çekiyoruz
-        val adaptiveTextColor = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
-            .getInt("dynamic_text_color", ContextCompat.getColor(activity, R.color.p_app_text_primary))
+        val prefs = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+        val customName = prefs.getString("custom_name_${a.bucketId ?: a.locationName}", null)
+        val displayName = customName ?: a.name
+
+        val customCover = prefs.getString("custom_cover_${a.bucketId ?: a.locationName}", null)
+        val coverToLoad = customCover ?: a.thumbnail
+
+        val adaptiveTextColor = prefs.getInt("dynamic_text_color", ContextCompat.getColor(activity, R.color.p_app_text_primary))
 
         Glide.with(activity)
             .asBitmap()
-            .load(a.thumbnail)
+            .load(coverToLoad)
             .error(activity.getPlaceholder())
             .centerCrop()
             .into(h.thumb)
         
-        h.name.text = "${a.name}\n${a.count}"
-        h.name.setTextColor(adaptiveTextColor) // UYARLANMIŞ RENK EKLENDİ
+        h.name.text = "$displayName\n${a.count}"
+        h.name.setTextColor(adaptiveTextColor) 
         
         h.itemView.setOnClickListener { 
-            activity.albumsRecycler.stopScroll()
-            activity.allRecycler.stopScroll()
-            
-            if (a.locationName != null) {
-                activity.filterLocation = a.locationName
-                activity.loadDisplayedList()
+            try {
+                activity.albumsRecycler.stopScroll()
+                activity.allRecycler.stopScroll()
+            } catch (e: Exception) {}
+
+            try {
+                if (a.locationName != null) {
+                    activity.filterLocation = a.locationName
+                    activity.loadDisplayedList()
+                } else if (a.bucketId != null) {
+                    activity.filterBucketId = a.bucketId
+                    activity.loadDisplayedList()
+                }
+                
                 activity.albumsRecycler.visibility = View.GONE
                 activity.coordinatorLayout.visibility = View.VISIBLE
                 activity.allRecycler.visibility = View.VISIBLE
-            } else if (a.bucketId != null) {
-                activity.filterBucketId = a.bucketId
-                activity.loadDisplayedList()
-                activity.albumsRecycler.visibility = View.GONE
-                activity.coordinatorLayout.visibility = View.VISIBLE
-                activity.allRecycler.visibility = View.VISIBLE
+
+                var photoCount = 0
+                var videoCount = 0
+                MainActivity.displayedMediaList.forEach { if (it.isVideo) videoCount++ else photoCount++ }
+                
+                val subtitleParts = mutableListOf<String>()
+                if (photoCount > 0) subtitleParts.add("$photoCount fotoğraf")
+                if (videoCount > 0) subtitleParts.add("$videoCount video")
+                val subText = subtitleParts.joinToString(", ")
+
+                val appBar = activity.findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBarLayout)
+                val collapsingToolbar = appBar?.getChildAt(0) as? com.google.android.material.appbar.CollapsingToolbarLayout
+                val params = collapsingToolbar?.layoutParams as? com.google.android.material.appbar.AppBarLayout.LayoutParams
+                if (params != null) {
+                    params.scrollFlags = 0 
+                    collapsingToolbar.layoutParams = params
+                }
+
+                activity.findViewById<LinearLayout>(R.id.albumStickyHeader)?.visibility = View.VISIBLE
+                
+                activity.mainTitle.text = displayName
+                activity.mainTitle.visibility = View.VISIBLE
+                
+                val subTitleView = activity.findViewById<TextView>(R.id.subTitle)
+                subTitleView?.text = subText
+                
+                activity.topIconsContainer.visibility = View.VISIBLE
+                val iconGroup = activity.topIconsContainer as? ViewGroup
+                iconGroup?.removeAllViews()
+                
+                val moreIcon = ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_action_more)
+                    setColorFilter(ContextCompat.getColor(activity, R.color.p_app_icon_tint))
+                    val pad = (12 * activity.resources.displayMetrics.density).toInt()
+                    setPadding(pad, pad, pad, pad)
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                    
+                    // ŞAHİN DİKKAT: Resource ID hatasını çözdüğüm yer burası. Yanlış türü çağırmak yerine güvenli şekilde çağırdım.
+                    val outValue = android.util.TypedValue()
+                    activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
+                    setBackgroundResource(outValue.resourceId)
+                    
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { anchor ->
+                        activity.showAlbumMoreMenu(anchor, a.bucketId, a.locationName, displayName)
+                    }
+                }
+                iconGroup?.addView(moreIcon)
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "Bir sorun oluştu: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         } 
     }

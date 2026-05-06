@@ -15,13 +15,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.AppCompatButton
 import androidx.core.content.ContextCompat
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.sahin.galerim.utils.BiometricHelper
 
-// Sekme değişimindeki sinsi sıfırlamaları 100ms pusuya yatarak ezen akıllı kurtarma fonksiyonu
 fun MainActivity.revertTabAndRestoreContext(onRestored: (() -> Unit)? = null) {
     if (bottomTabLayout.selectedTabPosition == 3) {
-        // 1. Albüm kimliklerini ve mevcut durumu tamamen güvence altına al
         val savedBucketId = filterBucketId
         val savedLocation = filterLocation
         val wasSearchMode = isSearchMode
@@ -29,33 +28,258 @@ fun MainActivity.revertTabAndRestoreContext(onRestored: (() -> Unit)? = null) {
         
         bottomTabLayout.tag = "restoring"
         
-        // 2. Sekmeyi eski yerine geçir (Bu işlem varsın sistemin sıfırlama komutlarını tetiklesin)
         bottomTabLayout.getTabAt(previousTabPosition)?.select()
         
-        // 3. Tab listener'ın bozduğu her şeyi 100 milisaniye sonra ezip zorla geri yükle
-        bottomTabLayout.postDelayed({
-            bottomTabLayout.tag = null
-            
-            if (savedBucketId != null) filterBucketId = savedBucketId
-            if (savedLocation != null) filterLocation = savedLocation
-            if (wasSearchMode) {
-                isSearchMode = true
-                currentSearchQuery = savedSearchQuery
-            }
-            
-            // Eğer "Arama Kutusunu Aç" gibi özel bir komut verildiyse tam bu an çalıştır
-            onRestored?.invoke()
-            
-            // Eğer bir albümün içindeysek veya arama modundaysak, listeyi zorla ekranda tut
-            if (filterBucketId != null || filterLocation != null || isSearchMode) {
-                allRecycler.visibility = View.VISIBLE
-                albumsRecycler.visibility = View.GONE
-                loadDisplayedList()
-            }
-        }, 100) // Kıpraşmayı ve albümden atılmayı kökünden çözen kilit gecikme
+        bottomTabLayout.tag = null
+        
+        if (savedBucketId != null) filterBucketId = savedBucketId
+        if (savedLocation != null) filterLocation = savedLocation
+        if (wasSearchMode) {
+            isSearchMode = true
+            currentSearchQuery = savedSearchQuery
+        }
+        
+        onRestored?.invoke()
+        
+        if (filterBucketId != null || filterLocation != null || isSearchMode) {
+            allRecycler.visibility = View.VISIBLE
+            albumsRecycler.visibility = View.GONE
+            loadDisplayedList()
+        }
     } else {
         onRestored?.invoke()
     }
+}
+
+fun MainActivity.showAlbumMoreMenu(anchor: View, bucketId: Long?, locationName: String?, albumName: String) {
+    val primaryColor = ContextCompat.getColor(this, R.color.p_app_text_primary)
+    val menuBgColor = getMenuBgColor()
+
+    val menuLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 50f
+            setColor(menuBgColor)
+        }
+        setPadding(0, 12, 0, 12)
+    }
+
+    val popup = PopupWindow(menuLayout, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+    popup.elevation = 30f
+
+    val options = listOf("Düzenle", "Yeniden isimlendir", "Kapak fotoğrafını değiştir", "Slayt gösterisini başlat")
+
+    for (opt in options) {
+        menuLayout.addView(TextView(this).apply {
+            text = opt
+            setTextColor(primaryColor)
+            textSize = 15f
+            setPadding(80, 32, 80, 32)
+            
+            val typedValue = android.util.TypedValue()
+            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+            setBackgroundResource(typedValue.resourceId)
+            isClickable = true
+            isFocusable = true
+            
+            setOnClickListener {
+                popup.dismiss()
+                when (opt) {
+                    "Düzenle" -> {
+                        isSelectionMode = true
+                        currentlyPlayingPosition = -1
+                        releaseMediaPlayer()
+                        updateSelectionUI()
+                        allRecycler.adapter?.notifyDataSetChanged()
+                    }
+                    "Yeniden isimlendir" -> {
+                        showRenameAlbumDialog(bucketId, locationName, albumName)
+                    }
+                    "Kapak fotoğrafını değiştir" -> {
+                        showCoverPhotoPicker(bucketId, locationName)
+                    }
+                    "Slayt gösterisini başlat" -> {
+                        if (MainActivity.displayedMediaList.isNotEmpty()) {
+                            val intent = Intent(this@showAlbumMoreMenu, FullScreenActivity::class.java)
+                            intent.putExtra("position", 0)
+                            intent.putExtra("isSlideshow", true)
+                            startActivity(intent)
+                        } else {
+                            showCustomToast(this@showAlbumMoreMenu, "Gösterilecek içerik yok", R.drawable.ic_action_check)
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    popup.showAsDropDown(anchor, 0, 10, Gravity.END)
+}
+
+fun MainActivity.showRenameAlbumDialog(bucketId: Long?, locationName: String?, currentName: String) {
+    val dialog = BottomSheetDialog(this)
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(48, 48, 48, 48)
+        background = GradientDrawable().apply {
+            setColor(getMenuBgColor())
+            cornerRadii = floatArrayOf(60f, 60f, 60f, 60f, 0f, 0f, 0f, 0f)
+        }
+    }
+
+    val title = TextView(this).apply {
+        text = "Albümü Yeniden İsimlendir"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 32)
+    }
+    layout.addView(title)
+
+    val input = android.widget.EditText(this).apply {
+        setText(currentName)
+        setTextColor(ContextCompat.getColor(this@showRenameAlbumDialog, R.color.p_app_text_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(getAccentColor())
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+    layout.addView(input)
+
+    val btnSave = AppCompatButton(this).apply {
+        text = "Kaydet"
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(getAccentColor())
+            cornerRadius = 30f
+        }
+        setTextColor(Color.WHITE)
+        setOnClickListener {
+            val newName = input.text.toString().trim()
+            if (newName.isNotEmpty()) {
+                val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+                prefs.edit().putString("custom_name_${bucketId ?: locationName}", newName).apply()
+                
+                val currentCountText = mainTitle.text.toString().substringAfter("\n", "")
+                mainTitle.text = "$newName\n$currentCountText"
+                
+                loadAllMedia()
+                dialog.dismiss()
+            }
+        }
+    }
+    layout.addView(btnSave)
+
+    dialog.setContentView(layout)
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    dialog.show()
+}
+
+fun MainActivity.showCoverPhotoPicker(bucketId: Long?, locationName: String?) {
+    if (MainActivity.displayedMediaList.isEmpty()) {
+        showCustomToast(this, "Albüm boş", R.drawable.ic_action_check)
+        return
+    }
+
+    val dialog = android.app.Dialog(this)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(ContextCompat.getColor(this@showCoverPhotoPicker, R.color.p_app_background))
+        layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    }
+
+    val toolbar = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(16, 48, 16, 32)
+    }
+
+    val backBtn = ImageView(this).apply {
+        setImageResource(R.drawable.ic_action_close)
+        setColorFilter(ContextCompat.getColor(this@showCoverPhotoPicker, R.color.p_app_icon_tint))
+        setPadding(16, 16, 16, 16)
+        
+        val typedValue = android.util.TypedValue()
+        context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, typedValue, true)
+        setBackgroundResource(typedValue.resourceId)
+        
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { dialog.dismiss() }
+    }
+
+    val title = TextView(this).apply {
+        text = "Kapak Fotoğrafı Seçin"
+        setTextColor(ContextCompat.getColor(this@showCoverPhotoPicker, R.color.p_app_text_primary))
+        textSize = 18f
+        setTypeface(null, android.graphics.Typeface.BOLD)
+        setPadding(32, 0, 0, 0)
+    }
+
+    toolbar.addView(backBtn)
+    toolbar.addView(title)
+    layout.addView(toolbar)
+
+    val spanCount = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE).getInt("gridSpanCount", 4)
+
+    val gridLayout = androidx.recyclerview.widget.RecyclerView(this).apply {
+        layoutManager = androidx.recyclerview.widget.GridLayoutManager(this@showCoverPhotoPicker, spanCount)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        setPadding(4, 4, 4, 4)
+        clipToPadding = false
+    }
+
+    gridLayout.adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): androidx.recyclerview.widget.RecyclerView.ViewHolder {
+            // Güvenli bağlantı: Senin kendi sağlam tasarımını (item_media.xml) kullanıyoruz. LayoutParams çökmesi olmaz.
+            val view = layoutInflater.inflate(R.layout.item_media, parent, false)
+            return object : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {}
+        }
+
+        override fun onBindViewHolder(holder: androidx.recyclerview.widget.RecyclerView.ViewHolder, position: Int) {
+            val media = MainActivity.displayedMediaList[position]
+            val view = holder.itemView
+            
+            val thumbnail = view.findViewById<ImageView>(R.id.mediaThumbnail)
+            
+            // Kapak seçimi ekranında gereksiz olan özellikleri güvenli bir şekilde gizliyoruz
+            view.findViewById<View>(R.id.videoInfoPanel)?.visibility = View.GONE
+            view.findViewById<View>(R.id.selectionOverlay)?.visibility = View.GONE
+            view.findViewById<View>(R.id.selectionCheck)?.visibility = View.GONE
+            view.findViewById<View>(R.id.mediaTextureView)?.visibility = View.GONE
+            
+            thumbnail?.visibility = View.VISIBLE
+            
+            thumbnail?.let {
+                com.bumptech.glide.Glide.with(this@showCoverPhotoPicker)
+                    .load(media.uri)
+                    .centerCrop()
+                    .into(it)
+            }
+            
+            view.setOnClickListener {
+                val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+                prefs.edit().putString("custom_cover_${bucketId ?: locationName}", media.uri.toString()).apply()
+                loadAllMedia()
+                showCustomToast(this@showCoverPhotoPicker, "Kapak fotoğrafı başarıyla değiştirildi", R.drawable.ic_action_check)
+                dialog.dismiss()
+            }
+        }
+
+        override fun getItemCount(): Int = MainActivity.displayedMediaList.size
+    }
+
+    layout.addView(gridLayout)
+    dialog.setContentView(layout)
+
+    dialog.window?.apply {
+        setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        setBackgroundDrawable(android.graphics.drawable.ColorDrawable(ContextCompat.getColor(this@showCoverPhotoPicker, R.color.p_app_background)))
+        clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+    }
+
+    dialog.show()
 }
 
 fun MainActivity.showMainMoreMenu(anchor: View) {
@@ -209,7 +433,6 @@ fun MainActivity.showGalleryMenuBottomSheet() {
         
         bottomSheetMenu?.dismiss()
         
-        // Arama işlemlerini pusu (callback) içine aldık. Sistem durulduğunda kusursuz açılacak!
         revertTabAndRestoreContext {
             isSearchMode = true
             searchContainer.visibility = View.VISIBLE

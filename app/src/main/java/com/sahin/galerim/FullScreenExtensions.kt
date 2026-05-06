@@ -245,7 +245,6 @@ fun FullScreenActivity.moveToAppTrash() {
                 }
             }
         } catch (e: Exception) {
-            // Hata yoksayılır
         }
 
         withContext(Dispatchers.Main) {
@@ -975,17 +974,42 @@ fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
     showFsCustomToast("Konum temizleniyor...", android.R.drawable.ic_menu_info_details)
     lifecycleScope.launch(Dispatchers.IO) {
         val item = items.first()
-        if(!item.isVideo) {
-            try {
-                val exif = ExifInterface(item.path)
-                exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, null)
-                exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, null)
-                exif.saveAttributes()
-            }catch(e:Exception){}
+        var isCleaned = false
+
+        // 1. Fiziksel olarak desteklenenlerin (JPG, PNG vb.) Exif verisini temizle
+        if (!item.isVideo) {
+            val ext = File(item.path).extension.lowercase(Locale("tr"))
+            if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                try {
+                    val exif = ExifInterface(item.path)
+                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, null)
+                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, null)
+                    exif.saveAttributes()
+                    isCleaned = true
+                } catch(e:Exception){}
+            }
         }
+
+        // 2. Videolar ve diğer formatlar için MediaStore veritabanı temizliği
+        try {
+            val values = ContentValues().apply {
+                putNull("latitude")
+                putNull("longitude")
+            }
+            contentResolver.update(item.uri, values, null, null)
+            isCleaned = true
+        } catch (e: Exception) {}
+
+        // 3. Uygulamanın kendi önbelleğinden (cache) konumu sil
+        if (isCleaned || item.isVideo) {
+            MainActivity.itemLocationCache.remove(item.path)
+            MainActivity.geocodeCache.remove(item.path)
+        }
+
         withContext(Dispatchers.Main) {
             val itemType = if (item.isVideo) "Video" else "Fotoğraf"
             showFsCustomToast("$itemType konum verileri temizlendi", android.R.drawable.ic_menu_info_details)
+            detailsDialog?.dismiss()
         }
     }
 }
@@ -1008,19 +1032,44 @@ fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, l
         val lngRef = if (lng >= 0) "E" else "W"
 
         val item = items.first()
-        if(!item.isVideo) {
-            try {
-                val exif = ExifInterface(item.path)
-                exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, latStr)
-                exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latRef)
-                exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, lngStr)
-                exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lngRef)
-                exif.saveAttributes()
-            } catch(e:Exception){}
+        var isUpdated = false
+
+        // 1. Fiziksel olarak desteklenenlere Exif verisini yaz
+        if (!item.isVideo) {
+            val ext = File(item.path).extension.lowercase(Locale("tr"))
+            if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                try {
+                    val exif = ExifInterface(item.path)
+                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, latStr)
+                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latRef)
+                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, lngStr)
+                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lngRef)
+                    exif.saveAttributes()
+                    isUpdated = true
+                } catch(e:Exception){}
+            }
         }
+
+        // 2. Sistem veritabanında (MediaStore) videonun konumunu güncelle
+        try {
+            val values = ContentValues().apply {
+                put("latitude", lat)
+                put("longitude", lng)
+            }
+            contentResolver.update(item.uri, values, null, null)
+            isUpdated = true
+        } catch(e: Exception) {}
+
+        // 3. Ayrıntılar menüsünde anında görünmesi için önbelleğe yaz
+        if (isUpdated || item.isVideo) {
+            MainActivity.itemLocationCache[item.path] = "$lat,$lng"
+            MainActivity.geocodeCache.remove(item.path)
+        }
+
         withContext(Dispatchers.Main) {
             val itemType = if (item.isVideo) "Video" else "Fotoğraf"
             showFsCustomToast("$itemType konumu başarıyla güncellendi", android.R.drawable.ic_menu_info_details)
+            detailsDialog?.dismiss()
         }
     }
 }
@@ -1058,6 +1107,19 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
     
     var resolutionStr = "Bilinmiyor"
     var locationStr = "Bilinmiyor"
+    
+    // ŞAHİN: Önce senin taze güncellediğin önbellekten (cache) kontrol edelim ki ayrıntıları açınca "Bilinmiyor" demesin!
+    val cachedLoc = MainActivity.itemLocationCache[item.path]
+    var tempLat: Double? = null
+    var tempLng: Double? = null
+    
+    if (cachedLoc != null) {
+        val parts = cachedLoc.split(",")
+        if (parts.size == 2) {
+            tempLat = parts[0].toDoubleOrNull()
+            tempLng = parts[1].toDoubleOrNull()
+        }
+    }
 
     try {
         if (item.isVideo) {
@@ -1066,18 +1128,14 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
             val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt() ?: 0
             if (w > 0 && h > 0) resolutionStr = "${w}x${h}  |  ${String.format("%.1f", (w * h) / 1000000.0)}MP"
             
-            val locMeta = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
-            if (locMeta != null) {
-                val matcher = Pattern.compile("([+-][0-9.]+)([+-][0-9.]+)").matcher(locMeta)
-                if (matcher.find()) {
-                    val lat = matcher.group(1)?.toDoubleOrNull()
-                    val lng = matcher.group(2)?.toDoubleOrNull()
-                    if (lat != null && lng != null) {
-                        val geocoder = Geocoder(this@showModernDetailsBottomSheet, Locale.getDefault())
-                        val addresses = geocoder.getFromLocation(lat, lng, 1)
-                        if (!addresses.isNullOrEmpty()) {
-                            locationStr = addresses[0].getAddressLine(0) ?: "$lat, $lng"
-                        }
+            // Eğer önbellekte bulamadıysak eski usul dosyanın içine bakalım
+            if (tempLat == null || tempLng == null) {
+                val locMeta = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+                if (locMeta != null) {
+                    val matcher = Pattern.compile("([+-][0-9.]+)([+-][0-9.]+)").matcher(locMeta)
+                    if (matcher.find()) {
+                        tempLat = matcher.group(1)?.toDoubleOrNull()
+                        tempLng = matcher.group(2)?.toDoubleOrNull()
                     }
                 }
             }
@@ -1090,16 +1148,27 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
                 }
             }
             
-            val exif = ExifInterface(item.path)
-            val latLong = FloatArray(2)
-            if (exif.getLatLong(latLong)) {
-                val lat = latLong[0].toDouble()
-                val lng = latLong[1].toDouble()
-                val geocoder = Geocoder(this@showModernDetailsBottomSheet, Locale.getDefault())
-                val addresses = geocoder.getFromLocation(lat, lng, 1)
-                if (!addresses.isNullOrEmpty()) {
-                    locationStr = addresses[0].getAddressLine(0) ?: "$lat, $lng"
+            if (tempLat == null || tempLng == null) {
+                val ext = File(item.path).extension.lowercase(Locale("tr"))
+                if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                    val exif = ExifInterface(item.path)
+                    val latLong = FloatArray(2)
+                    if (exif.getLatLong(latLong)) {
+                        tempLat = latLong[0].toDouble()
+                        tempLng = latLong[1].toDouble()
+                    }
                 }
+            }
+        }
+        
+        // Elimizde nihai bir koordinat varsa (ister cache ister exif) haritadan adresini çekiyoruz
+        if (tempLat != null && tempLng != null) {
+            val geocoder = Geocoder(this@showModernDetailsBottomSheet, Locale.getDefault())
+            val addresses = geocoder.getFromLocation(tempLat, tempLng, 1)
+            if (!addresses.isNullOrEmpty()) {
+                locationStr = addresses[0].getAddressLine(0) ?: "$tempLat, $tempLng"
+            } else {
+                locationStr = "$tempLat, $tempLng"
             }
         }
     } catch (e: Exception) {}

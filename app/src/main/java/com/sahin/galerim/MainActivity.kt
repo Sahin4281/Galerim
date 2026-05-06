@@ -388,21 +388,18 @@ class MainActivity : AppCompatActivity() {
         val layoutManager = GridLayoutManager(this, spanCount)
         layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int {
-                return if (galleryItems.getOrNull(position) is HeaderItem) spanCount else 1
+                val item = galleryItems.getOrNull(position)
+                return if (item is HeaderItem) spanCount else 1
             }
         }
         
         allRecycler.layoutManager = layoutManager
         allRecycler.adapter = AllMediaAdapter(this)
         
-        // --- NOKTA ATIŞI DÜZELTME BAŞLANGICI (ŞAHİN) ---
-        // Samsung Galerideki gibi sağdan ve soldan milimlik boşluk (gap) ekliyoruz.
-        // Bu boşluk, fotoğrafların ve tarih başlıklarının ekrana yapışmasını engeller ve hizalamayı sağlar.
         val density = resources.displayMetrics.density
-        val padding = (8 * density).toInt() // 8dp'lik pürüzsüz bir boşluk
+        val padding = (8 * density).toInt() 
         allRecycler.setPadding(padding, 0, padding, 0)
-        allRecycler.clipToPadding = false // Boşluğun kaydırma sırasında da pürüzsüz görünmesini sağlar
-        // --- NOKTA ATIŞI DÜZELTME BİTİŞİ (ŞAHİN) ---
+        allRecycler.clipToPadding = false 
 
         albumsRecycler.layoutManager = GridLayoutManager(this, spanCount)
         albumsRecycler.adapter = AlbumsAdapter(this)
@@ -435,6 +432,11 @@ class MainActivity : AppCompatActivity() {
                     allRecycler.visibility = View.GONE
                     albumsRecycler.visibility = View.VISIBLE
                     albumsRecycler.adapter?.notifyDataSetChanged()
+                    
+                    findViewById<View>(R.id.albumStickyHeader)?.visibility = View.GONE
+                    mainTitle.visibility = View.GONE
+                    topIconsContainer.visibility = View.GONE
+                    
                 } else if (isShowingTrash || isShowingFavorites || isShowingPlaces || isShowingLocations) { 
                     resetStates()
                     bottomTabLayout.getTabAt(0)?.select() 
@@ -465,6 +467,10 @@ class MainActivity : AppCompatActivity() {
         if (bottomTabLayout.selectedTabPosition == 2) {
             allRecycler.visibility = View.GONE
             albumsRecycler.visibility = View.VISIBLE
+            
+            findViewById<View>(R.id.albumStickyHeader)?.visibility = View.GONE
+            mainTitle.visibility = View.GONE
+            topIconsContainer.visibility = View.GONE
         }
         
         loadDisplayedList()

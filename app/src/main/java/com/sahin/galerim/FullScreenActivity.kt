@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -59,11 +60,114 @@ class FullScreenActivity : AppCompatActivity() {
     var isUiHidden = false
     var isAmoledTheme = false
 
+    // --- ŞAHİN: SLAYT GÖSTERİSİ DEĞİŞKENLERİ ---
+    var isSlideshowActive = false
+    val slideshowHandler = Handler(Looper.getMainLooper())
+    
+    // ŞAHİN: 1.2 saniyelik pürüzsüz ve sinematik kaydırma efekti (Fake Drag)
+    fun smoothScrollToNextSlide() {
+        val pxToDrag = viewPager.width
+        val durationMs = 1200L 
+        val interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+        
+        var dragStarted = false
+        val animator = android.animation.ValueAnimator.ofInt(0, pxToDrag)
+        var previousValue = 0
+        
+        animator.addUpdateListener { valueAnimator ->
+            val currentValue = valueAnimator.animatedValue as Int
+            val currentPxToDrag = (currentValue - previousValue).toFloat()
+            if (!dragStarted) {
+                dragStarted = true
+                viewPager.beginFakeDrag()
+            }
+            try {
+                viewPager.fakeDragBy(-currentPxToDrag)
+            } catch (e: Exception) {}
+            previousValue = currentValue
+        }
+        
+        animator.addListener(object : android.animation.AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: android.animation.Animator) {
+                if (dragStarted) {
+                    try { viewPager.endFakeDrag() } catch (e: Exception) {}
+                }
+            }
+        })
+        
+        animator.interpolator = interpolator
+        animator.duration = durationMs
+        animator.start()
+    }
+
+    val slideshowRunnable = object : Runnable {
+        override fun run() {
+            if (isSlideshowActive && !isFinishing) {
+                if (currentPosition < MainActivity.displayedMediaList.size - 1) {
+                    // Anında geçmek yerine sinematik geçişi çağırıyoruz
+                    smoothScrollToNextSlide()
+                } else {
+                    isSlideshowActive = false
+                    viewPager.setPageTransformer(null)
+                    if (isUiHidden) toggleUIVisibility()
+                    Toast.makeText(this@FullScreenActivity, "Slayt gösterisi bitti", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // ŞAHİN: Fotoğraflar geçerken arkadan öne doğru eriyerek (Depth Fade) gelen premium efekt
+    class CafcafliTransformer : ViewPager2.PageTransformer {
+        override fun transformPage(page: View, position: Float) {
+            val pageWidth = page.width
+            when {
+                position < -1 -> { page.alpha = 0f }
+                position <= 0 -> {
+                    page.alpha = 1f
+                    page.translationX = 0f
+                    page.translationZ = 0f
+                    page.scaleX = 1f
+                    page.scaleY = 1f
+                }
+                position <= 1 -> {
+                    page.alpha = 1f - position
+                    page.translationX = pageWidth * -position
+                    page.translationZ = -1f
+                    val scaleFactor = 0.85f + (1 - 0.85f) * (1 - kotlin.math.abs(position))
+                    page.scaleX = scaleFactor
+                    page.scaleY = scaleFactor
+                }
+                else -> { page.alpha = 0f }
+            }
+        }
+    }
+
+    fun startSlideshow() {
+        if (!isUiHidden) toggleUIVisibility()
+        isSlideshowActive = true 
+        viewPager.setPageTransformer(CafcafliTransformer())
+        scheduleNextSlide()
+    }
+
+    fun scheduleNextSlide() {
+        slideshowHandler.removeCallbacks(slideshowRunnable)
+        if (!isSlideshowActive) return
+        
+        val currentMedia = MainActivity.displayedMediaList.getOrNull(currentPosition) ?: return
+        var delay = 3500L 
+        
+        if (currentMedia.isVideo && currentMedia.duration > 0) {
+            delay = currentMedia.duration + 500L 
+            if (delay > 30000L) delay = 30000L 
+        }
+        slideshowHandler.postDelayed(slideshowRunnable, delay)
+    }
+
     private val folderPickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             val uri = result.data?.data
             if (uri != null) {
-                showFsCustomToast("Hedef klasör seçildi. Dosya işlemi başlatılıyor...", android.R.drawable.ic_menu_info_details)
+                Toast.makeText(this, "Hedef klasör seçildi. Dosya işlemi başlatılıyor...", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -193,6 +297,8 @@ class FullScreenActivity : AppCompatActivity() {
         }
         rootView.addView(btnGoToWeb, lp)
 
+        val isSlideshow = intent.getBooleanExtra("isSlideshow", false)
+
         viewPager.reduceFsDragSensitivity()
         currentPosition = intent.getIntExtra("position", 0)
         if (currentPosition >= MainActivity.displayedMediaList.size) currentPosition = 0
@@ -200,6 +306,10 @@ class FullScreenActivity : AppCompatActivity() {
         viewPager.adapter = FsFullScreenAdapter(this, MainActivity.displayedMediaList)
         viewPager.setCurrentItem(currentPosition, false)
         
+        if (isSlideshow) {
+            viewPager.postDelayed({ startSlideshow() }, 500)
+        }
+
         val layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         filmstripRecycler.layoutManager = layoutManager
         filmstripRecycler.adapter = FsFilmstripAdapter(this, MainActivity.displayedMediaList)
@@ -229,7 +339,7 @@ class FullScreenActivity : AppCompatActivity() {
                         val item = MainActivity.displayedMediaList[currentPosition]
                         if (item.isVideo) {
                             holder.mediaPlayerRef?.setVolume(if (isGlobalMuted) 0f else 1f, if (isGlobalMuted) 0f else 1f)
-                            if (autoPlay) {
+                            if (autoPlay || isSlideshowActive) {
                                 if (!holder.videoView.isPlaying) {
                                     holder.videoView.start()
                                     holder.btnBottomPlayPause.setImageResource(R.drawable.ic_modern_pause)
@@ -254,6 +364,10 @@ class FullScreenActivity : AppCompatActivity() {
                 checkAndShowWebButton(position)
                 
                 timeHandler.removeCallbacks(updateTimeRunnable)
+
+                if (isSlideshowActive) {
+                    scheduleNextSlide()
+                }
 
                 if (oldPosition != currentPosition) {
                     getViewHolder(oldPosition)?.let { oldHolder ->
@@ -350,7 +464,7 @@ class FullScreenActivity : AppCompatActivity() {
                             val finalUrl = if (!capturedUrl.startsWith("http")) "http://$capturedUrl" else capturedUrl
                             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl)))
                         } catch (e: Exception) {
-                            showFsCustomToast("Tarayıcı açılamadı", android.R.drawable.ic_menu_info_details)
+                            Toast.makeText(this@FullScreenActivity, "Tarayıcı açılamadı", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
@@ -372,18 +486,18 @@ class FullScreenActivity : AppCompatActivity() {
                                     val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
                                     if (browserIntent.resolveActivity(packageManager) != null) {
                                         startActivity(browserIntent)
-                                        showFsCustomToast("$buttonText bulunamadı, varsayılan tarayıcı açılıyor", android.R.drawable.ic_menu_info_details)
+                                        Toast.makeText(this@FullScreenActivity, "$buttonText bulunamadı, varsayılan tarayıcı açılıyor", Toast.LENGTH_SHORT).show()
                                     } else {
                                         val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
                                         if (playIntent.resolveActivity(packageManager) != null) {
                                             startActivity(playIntent)
                                         } else {
-                                            showFsCustomToast("Tarayıcı bulunamadı", android.R.drawable.ic_menu_info_details)
+                                            Toast.makeText(this@FullScreenActivity, "Tarayıcı bulunamadı", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
                             } catch (e: Exception) {
-                                showFsCustomToast("Tarayıcı açılamadı", android.R.drawable.ic_menu_info_details)
+                                Toast.makeText(this@FullScreenActivity, "Tarayıcı açılamadı", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } else {
@@ -406,6 +520,16 @@ class FullScreenActivity : AppCompatActivity() {
     }
 
     fun toggleUIVisibility(): Boolean {
+        if (isSlideshowActive) {
+            isSlideshowActive = false
+            slideshowHandler.removeCallbacks(slideshowRunnable)
+            viewPager.setPageTransformer(null)
+            Toast.makeText(this, "Slayt gösterisi durduruldu", Toast.LENGTH_SHORT).show()
+            if (!isUiHidden) {
+                return false
+            }
+        }
+
         isUiHidden = !isUiHidden
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -478,6 +602,13 @@ class FullScreenActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        
+        if (isSlideshowActive) {
+            isSlideshowActive = false
+            slideshowHandler.removeCallbacks(slideshowRunnable)
+            viewPager.setPageTransformer(null)
+        }
+        
         timeHandler.removeCallbacksAndMessages(null)
         activeViewHolder = null
         try {
@@ -563,10 +694,10 @@ class FullScreenActivity : AppCompatActivity() {
         
         if (MainActivity.favoritePaths.contains(item.path)) {
             MainActivity.favoritePaths.remove(item.path)
-            showFsCustomToast("1 $typeStr favorilerden çıkarıldı", 0)
+            Toast.makeText(this, "1 $typeStr favorilerden çıkarıldı", Toast.LENGTH_SHORT).show()
         } else {
             MainActivity.favoritePaths.add(item.path)
-            showFsCustomToast("1 $typeStr favorilere eklendi", 0)
+            Toast.makeText(this, "1 $typeStr favorilere eklendi", Toast.LENGTH_SHORT).show()
         }
         
         MainActivity.saveFavoritePaths(this)

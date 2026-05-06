@@ -70,7 +70,6 @@ fun MainActivity.performTrashRestore(items: List<MediaItem>) {
                 }
             }
         } catch (e: Exception) {
-            // Hata yoksayılır
         }
     }
     
@@ -169,7 +168,6 @@ fun MainActivity.performMultiDelete(items: List<MediaItem>, useTrash: Boolean) {
                 }
             }
         } catch (e: Exception) {
-            // Hata yoksayılır
         }
     }
     
@@ -216,7 +214,6 @@ fun MainActivity.processCopyMove(action: String, items: List<MediaItem>, destFol
                     }
                 }
             } catch (e: Exception) {
-                // Hata yoksayılır
             }
         }
         
@@ -251,11 +248,14 @@ fun MainActivity.saveNewDateToItems(items: List<MediaItem>, cal: Calendar) {
             
             try {
                 if (!item.isVideo) {
-                    val exif = ExifInterface(item.path)
-                    exif.setAttribute(ExifInterface.TAG_DATETIME, dateStr)
-                    exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, dateStr)
-                    exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, dateStr)
-                    exif.saveAttributes()
+                    val ext = File(item.path).extension.lowercase(Locale("tr"))
+                    if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                        val exif = ExifInterface(item.path)
+                        exif.setAttribute(ExifInterface.TAG_DATETIME, dateStr)
+                        exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, dateStr)
+                        exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, dateStr)
+                        exif.saveAttributes()
+                    }
                 }
                 
                 File(item.path).setLastModified(timeInMillis)
@@ -274,7 +274,6 @@ fun MainActivity.saveNewDateToItems(items: List<MediaItem>, cal: Calendar) {
                 pathsToScan.add(item.path)
                 
             } catch(e: Exception) {
-                // Hata yoksayılır
             }
         }
         
@@ -283,7 +282,6 @@ fun MainActivity.saveNewDateToItems(items: List<MediaItem>, cal: Calendar) {
                 android.media.MediaScannerConnection.scanFile(this@saveNewDateToItems, pathsToScan.toTypedArray(), null, null)
             }
             
-            // Kullanıcının mevcut sıralama tercihini al ve listeyi ona göre yeniden diz
             val prefs = getSharedPreferences("GalleryPrefs", android.content.Context.MODE_PRIVATE)
             val sortOrder = prefs.getString("sort_order", "Değiştirilme (önce yeni)")
             
@@ -309,38 +307,45 @@ fun MainActivity.clearLocationData(items: List<MediaItem>) {
     Toast.makeText(this, "Konum temizleniyor...", Toast.LENGTH_SHORT).show()
     
     lifecycleScope.launch(Dispatchers.IO) {
+        var successCount = 0
+
         for (item in items) {
+            var isCleaned = false
+            
+            // 1. Fiziksel olarak desteklenenlerin (JPG, PNG vb.) Exif verisini temizle
             if (!item.isVideo) {
-                try {
-                    val exif = ExifInterface(item.path)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, null)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, null)
-                    exif.saveAttributes()
-                } catch(e: Exception) {
-                    // Hata yoksayılır
+                val ext = File(item.path).extension.lowercase(Locale("tr"))
+                if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                    try {
+                        val exif = ExifInterface(item.path)
+                        exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, null)
+                        exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, null)
+                        exif.saveAttributes()
+                        isCleaned = true
+                    } catch(e: Exception) {}
                 }
+            }
+
+            // 2. Videolar ve diğer formatlar için MediaStore veritabanı temizliği
+            try {
+                val values = ContentValues().apply {
+                    putNull("latitude")
+                    putNull("longitude")
+                }
+                contentResolver.update(item.uri, values, null, null)
+                isCleaned = true
+            } catch (e: Exception) {}
+
+            // 3. Uygulamanın kendi önbelleğinden (cache) konumu sil ki klasörlerden hemen düşsün
+            if (isCleaned || item.isVideo) {
+                MainActivity.itemLocationCache.remove(item.path)
+                MainActivity.geocodeCache.remove(item.path)
+                successCount++
             }
         }
         
         withContext(Dispatchers.Main) {
-            var pCount = 0
-            var vCount = 0
-            
-            items.forEach { 
-                if (it.isVideo) {
-                    vCount++ 
-                } else {
-                    pCount++ 
-                }
-            }
-            
-            val msg = when {
-                pCount > 0 && vCount > 0 -> "$pCount fotoğraf ve $vCount video konum verileri temizlendi"
-                pCount > 0 -> "$pCount fotoğraf konum verileri temizlendi"
-                vCount > 0 -> "$vCount video konum verileri temizlendi"
-                else -> ""
-            }
-            
+            val msg = if (successCount > 0) "$successCount dosyanın konum verileri temizlendi" else "İşlem başarısız oldu"
             showCustomToast(this@clearLocationData, msg, android.R.drawable.ic_menu_info_details)
             exitSelectionMode()
             loadAllMedia()
@@ -357,40 +362,46 @@ fun MainActivity.updateLocationData(items: List<MediaItem>, lat: Double, lng: Do
         val latRef = if (lat >= 0) "N" else "S"
         val lngRef = if (lng >= 0) "E" else "W"
 
+        var successCount = 0
+
         for (item in items) {
+            var isUpdated = false
+
+            // 1. Fiziksel olarak desteklenenlere Exif verisini yaz
             if (!item.isVideo) {
-                try {
-                    val exif = ExifInterface(item.path)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, latStr)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latRef)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, lngStr)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lngRef)
-                    exif.saveAttributes()
-                } catch(e: Exception) {
-                    // Hata yoksayılır
+                val ext = File(item.path).extension.lowercase(Locale("tr"))
+                if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                    try {
+                        val exif = ExifInterface(item.path)
+                        exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, latStr)
+                        exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latRef)
+                        exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, lngStr)
+                        exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lngRef)
+                        exif.saveAttributes()
+                        isUpdated = true
+                    } catch(e: Exception) {}
                 }
+            }
+
+            // 2. Sistem veritabanında (MediaStore) videonun konumunu güncelle
+            try {
+                val values = ContentValues().apply {
+                    put("latitude", lat)
+                    put("longitude", lng)
+                }
+                contentResolver.update(item.uri, values, null, null)
+                isUpdated = true
+            } catch(e: Exception) {}
+
+            // 3. Videoların anında "Yerler" ve "Konumlar" sekmelerinde görünmesi için önbelleğe yaz
+            if (isUpdated || item.isVideo) {
+                MainActivity.itemLocationCache[item.path] = "$lat,$lng"
+                successCount++
             }
         }
         
         withContext(Dispatchers.Main) {
-            var pCount = 0
-            var vCount = 0
-            
-            items.forEach { 
-                if (it.isVideo) {
-                    vCount++ 
-                } else {
-                    pCount++ 
-                }
-            }
-            
-            val msg = when {
-                pCount > 0 && vCount > 0 -> "$pCount fotoğraf ve $vCount video konumu güncellendi"
-                pCount > 0 -> "$pCount fotoğraf konumu güncellendi"
-                vCount > 0 -> "$vCount video konumu güncellendi"
-                else -> ""
-            }
-            
+            val msg = if (successCount > 0) "$successCount dosyanın konumu güncellendi" else "Konum güncellenemedi"
             showCustomToast(this@updateLocationData, msg, android.R.drawable.ic_menu_info_details)
             exitSelectionMode()
             loadAllMedia()
@@ -504,7 +515,6 @@ fun MainActivity.repairMediaDates() {
                         targetMillis = cal.timeInMillis
                     }
                 } catch (e: Exception) {
-                    // Hata yoksayılır
                 }
             }
 
@@ -520,7 +530,6 @@ fun MainActivity.repairMediaDates() {
                         }
                     }
                 } catch (e: Exception) {
-                    // Hata yoksayılır
                 }
             }
 
@@ -531,12 +540,15 @@ fun MainActivity.repairMediaDates() {
                 if (Math.abs(currentSecs - targetSecs) > 60) {
                     try {
                         if (!item.isVideo) {
-                            val exif = ExifInterface(item.path)
-                            val dateStr = format.format(Date(targetMillis))
-                            exif.setAttribute(ExifInterface.TAG_DATETIME, dateStr)
-                            exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, dateStr)
-                            exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, dateStr)
-                            exif.saveAttributes()
+                            val ext = File(item.path).extension.lowercase(Locale("tr"))
+                            if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                                val exif = ExifInterface(item.path)
+                                val dateStr = format.format(Date(targetMillis))
+                                exif.setAttribute(ExifInterface.TAG_DATETIME, dateStr)
+                                exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, dateStr)
+                                exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, dateStr)
+                                exif.saveAttributes()
+                            }
                         }
                         
                         file.setLastModified(targetMillis)
@@ -558,7 +570,6 @@ fun MainActivity.repairMediaDates() {
                         repairedCount++
                         
                     } catch (e: Exception) {
-                        // Hata yoksayılır
                     }
                 }
             }
