@@ -18,6 +18,46 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.sahin.galerim.utils.BiometricHelper
 
+// Sekme değişimindeki sinsi sıfırlamaları 100ms pusuya yatarak ezen akıllı kurtarma fonksiyonu
+fun MainActivity.revertTabAndRestoreContext(onRestored: (() -> Unit)? = null) {
+    if (bottomTabLayout.selectedTabPosition == 3) {
+        // 1. Albüm kimliklerini ve mevcut durumu tamamen güvence altına al
+        val savedBucketId = filterBucketId
+        val savedLocation = filterLocation
+        val wasSearchMode = isSearchMode
+        val savedSearchQuery = currentSearchQuery
+        
+        bottomTabLayout.tag = "restoring"
+        
+        // 2. Sekmeyi eski yerine geçir (Bu işlem varsın sistemin sıfırlama komutlarını tetiklesin)
+        bottomTabLayout.getTabAt(previousTabPosition)?.select()
+        
+        // 3. Tab listener'ın bozduğu her şeyi 100 milisaniye sonra ezip zorla geri yükle
+        bottomTabLayout.postDelayed({
+            bottomTabLayout.tag = null
+            
+            if (savedBucketId != null) filterBucketId = savedBucketId
+            if (savedLocation != null) filterLocation = savedLocation
+            if (wasSearchMode) {
+                isSearchMode = true
+                currentSearchQuery = savedSearchQuery
+            }
+            
+            // Eğer "Arama Kutusunu Aç" gibi özel bir komut verildiyse tam bu an çalıştır
+            onRestored?.invoke()
+            
+            // Eğer bir albümün içindeysek veya arama modundaysak, listeyi zorla ekranda tut
+            if (filterBucketId != null || filterLocation != null || isSearchMode) {
+                allRecycler.visibility = View.VISIBLE
+                albumsRecycler.visibility = View.GONE
+                loadDisplayedList()
+            }
+        }, 100) // Kıpraşmayı ve albümden atılmayı kökünden çözen kilit gecikme
+    } else {
+        onRestored?.invoke()
+    }
+}
+
 fun MainActivity.showMainMoreMenu(anchor: View) {
     val primaryColor = ContextCompat.getColor(this, R.color.p_app_text_primary)
     val menuBgColor = getMenuBgColor()
@@ -104,6 +144,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     bottomSheetMenu?.setContentView(view)
     bottomSheetMenu?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
 
+    var isOpeningSubMenu = false
+
     view.findViewById<View>(R.id.menu_item_places)?.setOnClickListener {
         resetStates()
         isShowingPlaces = true
@@ -159,31 +201,43 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     }
 
     view.findViewById<View>(R.id.menu_item_search)?.setOnClickListener {
-        resetStates()
+        isOpeningSubMenu = true
+        isShowingTrash = false
+        isShowingFavorites = false
+        isShowingPlaces = false
+        isShowingLocations = false
+        
         bottomSheetMenu?.dismiss()
-        isSearchMode = true
-        searchContainer.visibility = View.VISIBLE
-        etSearch.requestFocus()
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(etSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-        allRecycler.visibility = View.VISIBLE
-        albumsRecycler.visibility = View.GONE
-        loadDisplayedList()
+        
+        // Arama işlemlerini pusu (callback) içine aldık. Sistem durulduğunda kusursuz açılacak!
+        revertTabAndRestoreContext {
+            isSearchMode = true
+            searchContainer.visibility = View.VISIBLE
+            topIconsContainer.visibility = View.GONE
+            etSearch.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(etSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            allRecycler.visibility = View.VISIBLE
+            albumsRecycler.visibility = View.GONE
+            loadDisplayedList()
+        }
     }
 
     view.findViewById<View>(R.id.menu_item_sort)?.setOnClickListener {
+        isOpeningSubMenu = true
         bottomSheetMenu?.dismiss()
         showSortBottomSheet()
     }
 
     view.findViewById<View>(R.id.menu_item_appearance)?.setOnClickListener {
+        isOpeningSubMenu = true
         bottomSheetMenu?.dismiss()
         showAppearanceBottomSheet()
     }
 
     bottomSheetMenu?.setOnDismissListener {
-        if (!isShowingTrash && !isShowingFavorites && !isShowingPlaces && !isShowingLocations && !isSearchMode && bottomTabLayout.selectedTabPosition == 3) {
-            bottomTabLayout.getTabAt(previousTabPosition)?.select()
+        if (!isOpeningSubMenu && !isShowingTrash && !isShowingFavorites && !isShowingPlaces && !isShowingLocations && !isSearchMode && bottomTabLayout.selectedTabPosition == 3) {
+            revertTabAndRestoreContext()
         }
     }
 
@@ -288,6 +342,11 @@ fun MainActivity.showSortBottomSheet() {
 
     sortBottomSheetMenu?.setContentView(layout)
     sortBottomSheetMenu?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    
+    sortBottomSheetMenu?.setOnDismissListener {
+        revertTabAndRestoreContext()
+    }
+    
     sortBottomSheetMenu?.show()
 }
 
@@ -659,6 +718,11 @@ fun MainActivity.showAppearanceBottomSheet() {
 
     appearanceBottomSheetMenu?.setContentView(layout)
     appearanceBottomSheetMenu?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    
+    appearanceBottomSheetMenu?.setOnDismissListener {
+        revertTabAndRestoreContext()
+    }
+    
     appearanceBottomSheetMenu?.show()
 }
 

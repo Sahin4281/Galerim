@@ -210,56 +210,129 @@ fun FullScreenActivity.showTrashDialog() {
 fun FullScreenActivity.moveToAppTrash() {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
     val item = MainActivity.displayedMediaList[currentPosition]
-    MainActivity.trashedPaths.add(item.path)
-    MainActivity.saveTrashedPaths(this)
-    MainActivity.mediaList.remove(item)
-    MainActivity.trashList.add(item)
-    MainActivity.displayedMediaList.removeAt(currentPosition)
     
-    MainActivity.forceReload = true
-    
-    if (currentPosition >= MainActivity.displayedMediaList.size && currentPosition > 0) {
-        currentPosition--
+    lifecycleScope.launch(Dispatchers.IO) {
+        var success = false
+        try {
+            val trashFolder = File(filesDir, ".galerim_trash")
+            if (!trashFolder.exists()) {
+                trashFolder.mkdirs()
+            }
+
+            val sourceFile = File(item.path)
+            if (sourceFile.exists()) {
+                val destFile = File(trashFolder, "${System.currentTimeMillis()}_${sourceFile.name}")
+                
+                FileInputStream(sourceFile).use { input ->
+                    FileOutputStream(destFile).use { output -> 
+                        input.copyTo(output) 
+                    }
+                }
+                
+                if (destFile.exists()) {
+                    destFile.setLastModified(sourceFile.lastModified())
+                    
+                    MainActivity.trashedPaths.add(destFile.absolutePath)
+                    MainActivity.trashedOriginalPaths[destFile.absolutePath] = sourceFile.absolutePath
+                    MainActivity.trashedTimestamps[destFile.absolutePath] = System.currentTimeMillis()
+                    MainActivity.trashedIsVideo[destFile.absolutePath] = item.isVideo
+                    MainActivity.trashedDurations[destFile.absolutePath] = item.duration
+                    MainActivity.trashedSizes[destFile.absolutePath] = item.size
+                    
+                    sourceFile.delete()
+                    contentResolver.delete(item.uri, null, null)
+                    success = true
+                }
+            }
+        } catch (e: Exception) {
+            // Hata yoksayılır
+        }
+
+        withContext(Dispatchers.Main) {
+            if (success) {
+                MainActivity.saveTrashedPaths(this@moveToAppTrash)
+                MainActivity.mediaList.remove(item)
+                MainActivity.trashList.add(item)
+                MainActivity.displayedMediaList.removeAt(currentPosition)
+                
+                MainActivity.forceReload = true
+                
+                if (currentPosition >= MainActivity.displayedMediaList.size && currentPosition > 0) {
+                    currentPosition--
+                }
+                
+                viewPager.adapter?.notifyDataSetChanged()
+                filmstripRecycler.adapter?.notifyDataSetChanged()
+                
+                val msg = if (item.isVideo) "1 video çöpe taşındı" else "1 fotoğraf çöpe taşındı"
+                showFsCustomToast(msg, R.drawable.ic_action_delete)
+                if (MainActivity.displayedMediaList.isEmpty()) finish()
+            } else {
+                showFsCustomToast("Taşıma başarısız oldu", android.R.drawable.ic_menu_info_details)
+            }
+        }
     }
-    
-    viewPager.adapter?.notifyDataSetChanged()
-    filmstripRecycler.adapter?.notifyDataSetChanged()
-    
-    val msg = if (item.isVideo) "1 video çöpe taşındı" else "1 fotoğraf çöpe taşındı"
-    showFsCustomToast(msg, R.drawable.ic_action_delete)
-    if (MainActivity.displayedMediaList.isEmpty()) finish()
 }
 
 fun FullScreenActivity.deletePermanently() {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
     val item = MainActivity.displayedMediaList[currentPosition]
-    try {
-        val file = File(item.path)
-        if (file.exists() && file.delete()) {
-            contentResolver.delete(item.uri, null, null)
-            MainActivity.trashedPaths.remove(item.path)
-        } else {
-            val rows = contentResolver.delete(item.uri, null, null)
-            if (rows > 0) MainActivity.trashedPaths.remove(item.path)
+    
+    lifecycleScope.launch(Dispatchers.IO) {
+        var success = false
+        try {
+            val file = File(item.path)
+            if (file.exists() && file.delete()) {
+                if (item.uri.scheme != "file") {
+                    contentResolver.delete(item.uri, null, null)
+                }
+                MainActivity.trashedPaths.remove(item.path)
+                MainActivity.trashedOriginalPaths.remove(item.path)
+                MainActivity.trashedTimestamps.remove(item.path)
+                MainActivity.trashedIsVideo.remove(item.path)
+                MainActivity.trashedDurations.remove(item.path)
+                MainActivity.trashedSizes.remove(item.path)
+                success = true
+            } else {
+                if (item.uri.scheme != "file") {
+                    val rows = contentResolver.delete(item.uri, null, null)
+                    if (rows > 0) {
+                        MainActivity.trashedPaths.remove(item.path)
+                        MainActivity.trashedOriginalPaths.remove(item.path)
+                        MainActivity.trashedTimestamps.remove(item.path)
+                        MainActivity.trashedIsVideo.remove(item.path)
+                        MainActivity.trashedDurations.remove(item.path)
+                        MainActivity.trashedSizes.remove(item.path)
+                        success = true
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+
+        withContext(Dispatchers.Main) {
+            if (success) {
+                MainActivity.saveTrashedPaths(this@deletePermanently)
+                MainActivity.mediaList.remove(item)
+                MainActivity.trashList.remove(item)
+                MainActivity.displayedMediaList.removeAt(currentPosition)
+                
+                MainActivity.forceReload = true
+                
+                if (currentPosition >= MainActivity.displayedMediaList.size && currentPosition > 0) {
+                    currentPosition--
+                }
+                
+                viewPager.adapter?.notifyDataSetChanged()
+                filmstripRecycler.adapter?.notifyDataSetChanged()
+                
+                val msg = if (item.isVideo) "1 video kalıcı olarak silindi" else "1 fotoğraf kalıcı olarak silindi"
+                showFsCustomToast(msg, R.drawable.ic_action_delete)
+                if (MainActivity.displayedMediaList.isEmpty()) finish()
+            } else {
+                showFsCustomToast("Silme başarısız oldu", android.R.drawable.ic_menu_info_details)
+            }
         }
-    } catch (e: Exception) {}
-    MainActivity.saveTrashedPaths(this)
-    MainActivity.mediaList.remove(item)
-    MainActivity.trashList.remove(item)
-    MainActivity.displayedMediaList.removeAt(currentPosition)
-    
-    MainActivity.forceReload = true
-    
-    if (currentPosition >= MainActivity.displayedMediaList.size && currentPosition > 0) {
-        currentPosition--
     }
-    
-    viewPager.adapter?.notifyDataSetChanged()
-    filmstripRecycler.adapter?.notifyDataSetChanged()
-    
-    val msg = if (item.isVideo) "1 video kalıcı olarak silindi" else "1 fotoğraf kalıcı olarak silindi"
-    showFsCustomToast(msg, R.drawable.ic_action_delete)
-    if (MainActivity.displayedMediaList.isEmpty()) finish()
 }
 
 fun FullScreenActivity.performHideMedia() {

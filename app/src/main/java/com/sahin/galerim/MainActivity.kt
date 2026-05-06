@@ -395,6 +395,15 @@ class MainActivity : AppCompatActivity() {
         allRecycler.layoutManager = layoutManager
         allRecycler.adapter = AllMediaAdapter(this)
         
+        // --- NOKTA ATIŞI DÜZELTME BAŞLANGICI (ŞAHİN) ---
+        // Samsung Galerideki gibi sağdan ve soldan milimlik boşluk (gap) ekliyoruz.
+        // Bu boşluk, fotoğrafların ve tarih başlıklarının ekrana yapışmasını engeller ve hizalamayı sağlar.
+        val density = resources.displayMetrics.density
+        val padding = (8 * density).toInt() // 8dp'lik pürüzsüz bir boşluk
+        allRecycler.setPadding(padding, 0, padding, 0)
+        allRecycler.clipToPadding = false // Boşluğun kaydırma sırasında da pürüzsüz görünmesini sağlar
+        // --- NOKTA ATIŞI DÜZELTME BİTİŞİ (ŞAHİN) ---
+
         albumsRecycler.layoutManager = GridLayoutManager(this, spanCount)
         albumsRecycler.adapter = AlbumsAdapter(this)
 

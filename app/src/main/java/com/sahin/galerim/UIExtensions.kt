@@ -39,7 +39,6 @@ fun MainActivity.applyDynamicColorsToUI() {
         val customColor = prefs.getInt("bg_color", actualBg)
         rootView?.setBackgroundColor(customColor)
         
-        // Rengin parlaklık analizi
         val r = Color.red(customColor)
         val g = Color.green(customColor)
         val b = Color.blue(customColor)
@@ -75,7 +74,6 @@ fun MainActivity.applyDynamicColorsToUI() {
                 }
 
                 if (bitmap != null) {
-                    // EXIF Döndürme (Rotation) Kontrolü
                     var rotationDegrees = 0f
                     try {
                         activity.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -99,7 +97,6 @@ fun MainActivity.applyDynamicColorsToUI() {
                         rotatedBitmap = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
                     }
 
-                    // SÜNMEYİ ÖNLEME: Center Crop işlemi (Doğru açıya çevrilmiş resim üzerinden)
                     val bgScale = Math.max(screenWidth.toFloat() / rotatedBitmap.width, screenHeight.toFloat() / rotatedBitmap.height)
                     val scaledWidth = Math.round(bgScale * rotatedBitmap.width)
                     val scaledHeight = Math.round(bgScale * rotatedBitmap.height)
@@ -114,7 +111,6 @@ fun MainActivity.applyDynamicColorsToUI() {
                     rootView?.background = drawable
                     bgSet = true
                     
-                    // RESMİN PARLAKLIK ANALİZİ
                     val pBmp = android.graphics.Bitmap.createScaledBitmap(finalBitmap, 1, 1, true)
                     val avgColor = pBmp.getPixel(0, 0)
                     val r = Color.red(avgColor)
@@ -140,7 +136,6 @@ fun MainActivity.applyDynamicColorsToUI() {
         isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
     }
     
-    // Adaptif yazı rengi (Arka plan açıksa SİYAH, koyuysa BEYAZ)
     val adaptiveTextColor = if (isDarkBg) Color.WHITE else Color.BLACK
     prefs.edit().putInt("dynamic_text_color", adaptiveTextColor).apply()
     
@@ -197,7 +192,6 @@ fun MainActivity.applyDynamicColorsToUI() {
     activity.findViewById<TextView>(R.id.btnTrashEdit)?.setTextColor(primaryColor)
     activity.findViewById<ImageView>(R.id.btnTrashMore)?.setColorFilter(iconTint)
     
-    // Boş Sayfalardaki yazıların Akıllı Renk Analizi ile değiştirilmesi
     (activity.emptyTrashView as? LinearLayout)?.let { layout ->
         for (i in 0 until layout.childCount) {
             val child = layout.getChildAt(i)
@@ -228,7 +222,6 @@ fun MainActivity.applyDynamicColorsToUI() {
         ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
     }
     
-    // Adaptörleri anında güncelleyerek tarih başlıklarının renklerini aktifleştiriyoruz
     activity.allRecycler.adapter?.notifyDataSetChanged()
     activity.albumsRecycler.adapter?.notifyDataSetChanged()
 }
@@ -403,6 +396,9 @@ fun MainActivity.updateSelectionUI() {
 
 fun MainActivity.resetStates() { 
     val activity = this
+    // NOKTA ATIŞI: Sekme geri yüklenirken state'lerin sıfırlanmasını (kıpraşmayı ve albümden atmayı) engeller.
+    if (activity.bottomTabLayout.tag == "restoring") return
+    
     activity.isShowingTrash = false
     activity.isShowingFavorites = false
     activity.isShowingPlaces = false
