@@ -1,65 +1,50 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/MainActivity.kt",
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/local.properties",
       "selection": {
         "end": {
           "column": 0,
-          "index": 25982,
-          "line": 636
+          "index": 55,
+          "line": 1
         },
         "start": {
           "column": 0,
-          "index": 25982,
-          "line": 636
+          "index": 55,
+          "line": 1
         }
       }
     },
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/res/layout/activity_main.xml",
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/build.gradle.kts",
       "selection": {
         "end": {
           "column": 0,
-          "index": 27201,
-          "line": 586
+          "index": 2550,
+          "line": 75
         },
         "start": {
           "column": 0,
-          "index": 27201,
-          "line": 586
+          "index": 2550,
+          "line": 75
         }
       }
     },
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/res/layout/layout_album_side_menu.xml",
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/AndroidManifest.xml",
       "selection": {
         "end": {
-          "column": 0,
-          "index": 1092,
-          "line": 33
+          "column": 11,
+          "index": 4373,
+          "line": 109
         },
         "start": {
-          "column": 0,
-          "index": 1092,
-          "line": 33
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/SideMenuExtensions.kt",
-      "selection": {
-        "end": {
-          "column": 0,
-          "index": 7879,
-          "line": 196
-        },
-        "start": {
-          "column": 0,
-          "index": 7879,
-          "line": 196
+          "column": 11,
+          "index": 4373,
+          "line": 109
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/SideMenuExtensions.kt"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/galerim/app/build.gradle.kts"
 }
