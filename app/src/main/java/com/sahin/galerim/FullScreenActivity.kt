@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,11 +61,9 @@ class FullScreenActivity : AppCompatActivity() {
     var isUiHidden = false
     var isAmoledTheme = false
 
-    // --- ŞAHİN: SLAYT GÖSTERİSİ DEĞİŞKENLERİ ---
     var isSlideshowActive = false
     val slideshowHandler = Handler(Looper.getMainLooper())
     
-    // ŞAHİN: 1.2 saniyelik pürüzsüz ve sinematik kaydırma efekti (Fake Drag)
     fun smoothScrollToNextSlide() {
         val pxToDrag = viewPager.width
         val durationMs = 1200L 
@@ -104,7 +103,6 @@ class FullScreenActivity : AppCompatActivity() {
         override fun run() {
             if (isSlideshowActive && !isFinishing) {
                 if (currentPosition < MainActivity.displayedMediaList.size - 1) {
-                    // Anında geçmek yerine sinematik geçişi çağırıyoruz
                     smoothScrollToNextSlide()
                 } else {
                     isSlideshowActive = false
@@ -116,7 +114,6 @@ class FullScreenActivity : AppCompatActivity() {
         }
     }
 
-    // ŞAHİN: Fotoğraflar geçerken arkadan öne doğru eriyerek (Depth Fade) gelen premium efekt
     class CafcafliTransformer : ViewPager2.PageTransformer {
         override fun transformPage(page: View, position: Float) {
             val pageWidth = page.width
@@ -305,6 +302,24 @@ class FullScreenActivity : AppCompatActivity() {
         
         viewPager.adapter = FsFullScreenAdapter(this, MainActivity.displayedMediaList)
         viewPager.setCurrentItem(currentPosition, false)
+
+        viewPager.adapter?.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+            override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) {
+                viewPager.postDelayed({
+                    if (MainActivity.displayedMediaList.isEmpty()) {
+                        finish()
+                        return@postDelayed
+                    }
+                    val newPos = viewPager.currentItem
+                    if (newPos >= 0 && newPos < MainActivity.displayedMediaList.size) {
+                        currentPosition = newPos
+                        viewPager.adapter?.notifyItemChanged(newPos)
+                        updateFavoriteIcon()
+                        checkAndShowWebButton(newPos)
+                    }
+                }, 300)
+            }
+        })
         
         if (isSlideshow) {
             viewPager.postDelayed({ startSlideshow() }, 500)
@@ -387,6 +402,7 @@ class FullScreenActivity : AppCompatActivity() {
                     if (MainActivity.displayedMediaList[position].isVideo) {
                         val uriString = MainActivity.displayedMediaList[position].uri.toString()
                         if (newHolder.videoView.tag != uriString) {
+                            newHolder.videoView.stopPlayback()
                             newHolder.videoView.tag = uriString
                             newHolder.videoView.setVideoURI(MainActivity.displayedMediaList[position].uri)
                         }
@@ -694,13 +710,45 @@ class FullScreenActivity : AppCompatActivity() {
         
         if (MainActivity.favoritePaths.contains(item.path)) {
             MainActivity.favoritePaths.remove(item.path)
-            Toast.makeText(this, "1 $typeStr favorilerden çıkarıldı", Toast.LENGTH_SHORT).show()
+            showFsCustomToast("1 $typeStr favorilerden çıkarıldı")
         } else {
             MainActivity.favoritePaths.add(item.path)
-            Toast.makeText(this, "1 $typeStr favorilere eklendi", Toast.LENGTH_SHORT).show()
+            showFsCustomToast("1 $typeStr favorilere eklendi")
         }
         
         MainActivity.saveFavoritePaths(this)
         updateFavoriteIcon()
+    }
+
+    fun showFsCustomToast(message: String) {
+        try {
+            val rootView = findViewById<ViewGroup>(android.R.id.content)
+            val layout = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#333333"))
+                    cornerRadius = 50f
+                }
+                setPadding(40, 24, 40, 24)
+            }
+            val text = TextView(this).apply {
+                this.text = message
+                setTextColor(Color.WHITE)
+                textSize = 15f
+            }
+            layout.addView(text)
+            
+            val params = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = 150
+            }
+            rootView.addView(layout, params)
+            layout.startAnimation(android.view.animation.AlphaAnimation(0.0f, 1.0f).apply { duration = 400 })
+            Handler(Looper.getMainLooper()).postDelayed({
+                layout.startAnimation(android.view.animation.AlphaAnimation(1.0f, 0.0f).apply { duration = 400 })
+                Handler(Looper.getMainLooper()).postDelayed({ rootView.removeView(layout) }, 400)
+            }, 2000)
+        } catch (e: Exception) {}
     }
 }

@@ -20,10 +20,12 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
+import java.io.File
 
 class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     
@@ -46,7 +48,6 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
         super.onViewRecycled(holder)
         if (holder is MediaViewHolder) {
             if (holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
-                activity.currentlyPlayingPosition = -1
                 activity.releaseMediaPlayer()
             }
             holder.texture.visibility = View.GONE
@@ -181,96 +182,121 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                 holder.panel.visibility = View.VISIBLE
                 holder.dur.text = formatDuration(m.duration)
                 
-                if (!activity.isSelectionMode && pos == activity.currentlyPlayingPosition && activity.isActivityResumed) {
+                if (!activity.isShowingTrash && !activity.isSelectionMode && pos == activity.currentlyPlayingPosition && activity.isActivityResumed) {
                     holder.texture.visibility = View.VISIBLE
-                    holder.texture.alpha = 0f
-                    holder.thumbnail.visibility = View.VISIBLE
                     
-                    fun startPlayer(st: SurfaceTexture) {
-                        try {
-                            activity.releaseMediaPlayer()
-                            if (activity.isActivityResumed && holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
-                                val surface = Surface(st) 
-                                activity.mediaPlayer = MediaPlayer().apply {
-                                    setSurface(surface)
-                                    setDataSource(activity, m.uri)
-                                    setVolume(0f, 0f)
-                                    isLooping = true
-                                    setOnErrorListener { _, _, _ -> 
-                                        activity.releaseMediaPlayer()
-                                        true 
-                                    }
-                                    setOnInfoListener { _, what, _ ->
-                                        if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                                            holder.texture.post {
-                                                if (holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
-                                                    holder.texture.alpha = 1f
-                                                    holder.thumbnail.visibility = View.INVISIBLE
+                    val isAlreadyPlaying = activity.mediaPlayer != null && activity.currentlyPlayingMediaPath == m.path
+                    
+                    if (!isAlreadyPlaying) {
+                        holder.texture.alpha = 0f
+                        holder.thumbnail.visibility = View.VISIBLE
+                        
+                        fun startPlayer(st: SurfaceTexture) {
+                            try {
+                                activity.releaseMediaPlayer()
+                                if (activity.isActivityResumed && holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
+                                    val surface = Surface(st) 
+                                    activity.mediaPlayer = MediaPlayer().apply {
+                                        setSurface(surface)
+                                        try {
+                                            setDataSource(activity, m.uri)
+                                        } catch (e: Exception) {
+                                            try { setDataSource(m.path) } catch(e2: Exception) {}
+                                        }
+                                        setVolume(0f, 0f)
+                                        isLooping = true
+                                        setOnErrorListener { _, _, _ -> 
+                                            activity.releaseMediaPlayer()
+                                            true 
+                                        }
+                                        setOnInfoListener { _, what, _ ->
+                                            if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                                                holder.texture.post {
+                                                    if (holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
+                                                        holder.texture.alpha = 1f
+                                                        holder.thumbnail.visibility = View.INVISIBLE
+                                                    }
                                                 }
                                             }
+                                            true
                                         }
-                                        true
+                                        setOnPreparedListener { mp ->
+                                            if (!activity.isActivityResumed || holder.bindingAdapterPosition != activity.currentlyPlayingPosition) { 
+                                                activity.releaseMediaPlayer()
+                                                return@setOnPreparedListener 
+                                            }
+                                            
+                                            val viewWidth = holder.texture.width.toFloat()
+                                            val viewHeight = holder.texture.height.toFloat()
+                                            val videoWidth = mp.videoWidth.toFloat()
+                                            val videoHeight = mp.videoHeight.toFloat()
+                                            
+                                            if (viewWidth > 0 && viewHeight > 0 && videoWidth > 0 && videoHeight > 0) {
+                                                val scaleX = viewWidth / videoWidth
+                                                val scaleY = viewHeight / videoHeight
+                                                val scale = maxOf(scaleX, scaleY)
+                                                val scaledWidth = scale * videoWidth
+                                                val scaledHeight = scale * videoHeight
+                                                val pivotX = viewWidth / 2f
+                                                val pivotY = viewHeight / 2f
+                                                val matrix = Matrix()
+                                                matrix.setScale(scaledWidth / viewWidth, scaledHeight / viewHeight, pivotX, pivotY)
+                                                holder.texture.setTransform(matrix)
+                                            }
+                                            
+                                            try { 
+                                                mp.start() 
+                                                holder.texture.postDelayed({
+                                                    if (activity.isActivityResumed && holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
+                                                        holder.texture.alpha = 1f
+                                                        holder.thumbnail.visibility = View.INVISIBLE
+                                                    }
+                                                }, 100)
+                                            } catch (e: Exception) { 
+                                                activity.releaseMediaPlayer() 
+                                            }
+                                        }
+                                        prepareAsync()
                                     }
-                                    setOnPreparedListener { mp ->
-                                        if (!activity.isActivityResumed || holder.bindingAdapterPosition != activity.currentlyPlayingPosition) { 
-                                            activity.releaseMediaPlayer()
-                                            return@setOnPreparedListener 
-                                        }
-                                        
-                                        val viewWidth = holder.texture.width.toFloat()
-                                        val viewHeight = holder.texture.height.toFloat()
-                                        val videoWidth = mp.videoWidth.toFloat()
-                                        val videoHeight = mp.videoHeight.toFloat()
-                                        
-                                        if (viewWidth > 0 && viewHeight > 0 && videoWidth > 0 && videoHeight > 0) {
-                                            val scaleX = viewWidth / videoWidth
-                                            val scaleY = viewHeight / videoHeight
-                                            val scale = maxOf(scaleX, scaleY)
-                                            val scaledWidth = scale * videoWidth
-                                            val scaledHeight = scale * videoHeight
-                                            val pivotX = viewWidth / 2f
-                                            val pivotY = viewHeight / 2f
-                                            val matrix = Matrix()
-                                            matrix.setScale(scaledWidth / viewWidth, scaledHeight / viewHeight, pivotX, pivotY)
-                                            holder.texture.setTransform(matrix)
-                                        }
-                                        
-                                        try { 
-                                            mp.start() 
-                                        } catch (e: Exception) { 
-                                            activity.releaseMediaPlayer() 
-                                        }
-                                    }
-                                    prepareAsync()
                                 }
+                            } catch (e: Exception) { 
+                                activity.releaseMediaPlayer() 
                             }
-                        } catch (e: Exception) { 
-                            activity.releaseMediaPlayer() 
                         }
-                    }
 
-                    if (holder.texture.isAvailable) {
-                        startPlayer(holder.texture.surfaceTexture!!)
-                    } else {
-                        holder.texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, hi: Int) { 
-                                if (holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
-                                    startPlayer(st) 
+                        if (holder.texture.isAvailable) {
+                            startPlayer(holder.texture.surfaceTexture!!)
+                        } else {
+                            holder.texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, hi: Int) { 
+                                    if (holder.bindingAdapterPosition == activity.currentlyPlayingPosition) {
+                                        startPlayer(st) 
+                                    }
                                 }
+                                override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, hi: Int) {}
+                                override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean { 
+                                    return true 
+                                }
+                                override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
                             }
-                            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, hi: Int) {}
-                            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean { 
-                                return true 
-                            }
-                            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
                         }
+                    } else {
+                        holder.texture.alpha = 1f
+                        holder.thumbnail.visibility = View.INVISIBLE
                     }
                 } else { 
                     holder.texture.visibility = View.GONE
                     holder.texture.surfaceTextureListener = null 
                     holder.texture.alpha = 1f
                     holder.thumbnail.visibility = View.VISIBLE
-                    Glide.with(activity).asBitmap().load(m.uri).error(activity.getPlaceholder()).centerCrop().into(holder.thumbnail) 
+                    Glide.with(activity)
+                        .asBitmap()
+                        .load(m.uri)
+                        .override(400, 400)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .error(activity.getPlaceholder())
+                        .centerCrop()
+                        .into(holder.thumbnail) 
                 }
             } else if (isAnim) {
                 holder.panel.visibility = View.GONE
@@ -295,20 +321,39 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
                                     if (holder.bindingAdapterPosition == pos) {
-                                        Glide.with(activity).load(m.uri).error(activity.getPlaceholder()).centerCrop().into(holder.thumbnail)
+                                        Glide.with(activity)
+                                            .load(m.uri)
+                                            .override(400, 400)
+                                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                            .error(activity.getPlaceholder())
+                                            .centerCrop()
+                                            .into(holder.thumbnail)
                                     }
                                 }
                             }
                         }
                     } else {
-                        Glide.with(activity).load(m.uri).error(activity.getPlaceholder()).centerCrop().into(holder.thumbnail)
+                        Glide.with(activity)
+                            .load(m.uri)
+                            .override(400, 400)
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .error(activity.getPlaceholder())
+                            .centerCrop()
+                            .into(holder.thumbnail)
                     }
                 } else {
                     val currentDrawable = holder.thumbnail.drawable
                     if (currentDrawable is Animatable) {
                         currentDrawable.stop()
                     }
-                    Glide.with(activity).asBitmap().load(m.uri).error(activity.getPlaceholder()).centerCrop().into(holder.thumbnail)
+                    Glide.with(activity)
+                        .asBitmap()
+                        .load(m.uri)
+                        .override(400, 400)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .error(activity.getPlaceholder())
+                        .centerCrop()
+                        .into(holder.thumbnail)
                 }
             } else { 
                 holder.panel.visibility = View.GONE
@@ -316,7 +361,14 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                 holder.texture.surfaceTextureListener = null
                 holder.texture.alpha = 1f
                 holder.thumbnail.visibility = View.VISIBLE
-                Glide.with(activity).asBitmap().load(m.uri).error(activity.getPlaceholder()).centerCrop().into(holder.thumbnail) 
+                Glide.with(activity)
+                    .asBitmap()
+                    .load(m.uri)
+                    .override(400, 400)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .error(activity.getPlaceholder())
+                    .centerCrop()
+                    .into(holder.thumbnail) 
             }
             
             holder.itemView.setOnLongClickListener { 
@@ -413,6 +465,8 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
         Glide.with(activity)
             .asBitmap()
             .load(coverToLoad)
+            .override(400, 400)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
             .error(activity.getPlaceholder())
             .centerCrop()
             .into(h.thumb)
@@ -422,11 +476,16 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
         
         h.itemView.setOnClickListener { 
             try {
+                activity.currentlyPlayingPosition = -1
+                activity.releaseMediaPlayer()
+                
                 activity.albumsRecycler.stopScroll()
                 activity.allRecycler.stopScroll()
             } catch (e: Exception) {}
 
             try {
+                activity.enableSideMenu(true)
+
                 if (a.locationName != null) {
                     activity.filterLocation = a.locationName
                     activity.loadDisplayedList()
@@ -475,7 +534,6 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
                     setPadding(pad, pad, pad, pad)
                     layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                     
-                    // ŞAHİN DİKKAT: Resource ID hatasını çözdüğüm yer burası. Yanlış türü çağırmak yerine güvenli şekilde çağırdım.
                     val outValue = android.util.TypedValue()
                     activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
                     setBackgroundResource(outValue.resourceId)

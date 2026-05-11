@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION", "UNUSED_VARIABLE")
+
 package com.sahin.galerim
 
 import android.Manifest
@@ -72,7 +74,13 @@ fun Context.showFsCustomToast(message: String, iconResId: Int) {
     val activity = this as? androidx.appcompat.app.AppCompatActivity ?: return
     try {
         val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
+        val existing = rootView.findViewWithTag<View>("FS_CUSTOM_TOAST")
+        if (existing != null) {
+            rootView.removeView(existing)
+        }
+        
         val layout = LinearLayout(activity).apply {
+            tag = "FS_CUSTOM_TOAST"
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable().apply {
@@ -117,7 +125,7 @@ fun FullScreenActivity.handleEdit() {
     val item = MainActivity.displayedMediaList[currentPosition]
     if (!item.isVideo) {
         startActivity(Intent.createChooser(Intent(Intent.ACTION_EDIT).apply { setDataAndType(item.uri, "image/*"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }, "Fotoğrafı düzenle"))
-    } else { showFsCustomToast("Videolar şimdilik düzenlenemez.", android.R.drawable.ic_menu_info_details) }
+    } else { showFsCustomToast("Videolar şimdilik düzenlenemez.", 0) }
 }
 
 fun FullScreenActivity.handleShare() {
@@ -156,7 +164,6 @@ fun FullScreenActivity.showTrashDialog() {
     }
     
     val btnConfirm = view.findViewById<AppCompatButton>(R.id.btnConfirm)
-    val btnCancel = view.findViewById<AppCompatButton>(R.id.btnCancel)
     val parentLayout = btnConfirm.parent as? ViewGroup
     
     if (parentLayout is LinearLayout) {
@@ -207,6 +214,89 @@ fun FullScreenActivity.showTrashDialog() {
     trashDialog?.show()
 }
 
+fun FullScreenActivity.showHideConfirmationDialog(items: List<MediaItem>) {
+    val dialogBgColor = ContextCompat.getColor(this, R.color.p_app_dialog_bg)
+    val primaryColor = ContextCompat.getColor(this, R.color.p_app_text_primary)
+    
+    val dialog = BottomSheetDialog(this)
+    val view = layoutInflater.inflate(R.layout.dialog_trash_confirmation, null)
+    dialog.setContentView(view)
+    
+    view.background = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = 60f
+        setColor(if (isAmoledTheme) Color.BLACK else dialogBgColor)
+    }
+    
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    
+    val messageView = view.findViewById<TextView>(R.id.dialogMessage)
+    messageView.gravity = Gravity.CENTER
+    messageView.setTextColor(primaryColor)
+
+    var photoCount = 0
+    var videoCount = 0
+    
+    items.forEach { 
+        if (it.isVideo) videoCount++ else photoCount++ 
+    }
+    
+    val itemsText = when {
+        photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf ve $videoCount video"
+        photoCount > 0 -> "$photoCount fotoğraf"
+        videoCount > 0 -> "$videoCount video"
+        else -> ""
+    }
+    
+    messageView.text = "$itemsText gizli klasöre taşınsın mı?"
+    
+    val btnConfirm = view.findViewById<AppCompatButton>(R.id.btnConfirm)
+    val parentLayout = btnConfirm.parent as? ViewGroup
+    
+    if (parentLayout is LinearLayout) {
+        parentLayout.removeAllViews()
+        parentLayout.gravity = Gravity.CENTER
+        
+        val dp10 = (10 * resources.displayMetrics.density).toInt()
+        val btnWidth = (110 * resources.displayMetrics.density).toInt() 
+        val btnHeight = (42 * resources.displayMetrics.density).toInt()
+        
+        val btnCancelNew = AppCompatButton(this).apply {
+            text = "İptal"
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#4CAF50")) 
+                cornerRadius = 30f
+            }
+            layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginEnd = dp10 }
+            setOnClickListener { dialog.dismiss() }
+        }
+        
+        val btnConfirmNew = AppCompatButton(this).apply {
+            text = "Gizle"
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#FF5252")) 
+                cornerRadius = 30f
+            }
+            layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginStart = dp10 }
+            setOnClickListener {
+                dialog.dismiss()
+                performHideMedia()
+            }
+        }
+        
+        parentLayout.addView(btnCancelNew)
+        parentLayout.addView(btnConfirmNew)
+    }
+
+    dialog.show()
+}
+
 fun FullScreenActivity.moveToAppTrash() {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
     val item = MainActivity.displayedMediaList[currentPosition]
@@ -223,10 +313,14 @@ fun FullScreenActivity.moveToAppTrash() {
             if (sourceFile.exists()) {
                 val destFile = File(trashFolder, "${System.currentTimeMillis()}_${sourceFile.name}")
                 
-                FileInputStream(sourceFile).use { input ->
-                    FileOutputStream(destFile).use { output -> 
-                        input.copyTo(output) 
+                val moved = sourceFile.renameTo(destFile)
+                if (!moved) {
+                    FileInputStream(sourceFile).use { input ->
+                        FileOutputStream(destFile).use { output -> 
+                            input.copyTo(output) 
+                        }
                     }
+                    sourceFile.delete()
                 }
                 
                 if (destFile.exists()) {
@@ -239,7 +333,6 @@ fun FullScreenActivity.moveToAppTrash() {
                     MainActivity.trashedDurations[destFile.absolutePath] = item.duration
                     MainActivity.trashedSizes[destFile.absolutePath] = item.size
                     
-                    sourceFile.delete()
                     contentResolver.delete(item.uri, null, null)
                     success = true
                 }
@@ -264,10 +357,10 @@ fun FullScreenActivity.moveToAppTrash() {
                 filmstripRecycler.adapter?.notifyDataSetChanged()
                 
                 val msg = if (item.isVideo) "1 video çöpe taşındı" else "1 fotoğraf çöpe taşındı"
-                showFsCustomToast(msg, R.drawable.ic_action_delete)
+                showFsCustomToast(msg, 0)
                 if (MainActivity.displayedMediaList.isEmpty()) finish()
             } else {
-                showFsCustomToast("Taşıma başarısız oldu", android.R.drawable.ic_menu_info_details)
+                showFsCustomToast("Taşıma başarısız oldu", 0)
             }
         }
     }
@@ -325,10 +418,10 @@ fun FullScreenActivity.deletePermanently() {
                 filmstripRecycler.adapter?.notifyDataSetChanged()
                 
                 val msg = if (item.isVideo) "1 video kalıcı olarak silindi" else "1 fotoğraf kalıcı olarak silindi"
-                showFsCustomToast(msg, R.drawable.ic_action_delete)
+                showFsCustomToast(msg, 0)
                 if (MainActivity.displayedMediaList.isEmpty()) finish()
             } else {
-                showFsCustomToast("Silme başarısız oldu", android.R.drawable.ic_menu_info_details)
+                showFsCustomToast("Silme başarısız oldu", 0)
             }
         }
     }
@@ -337,6 +430,17 @@ fun FullScreenActivity.deletePermanently() {
 fun FullScreenActivity.performHideMedia() {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
     val item = MainActivity.displayedMediaList[currentPosition]
+
+    try {
+        getViewHolder(currentPosition)?.let { holder ->
+            if (holder.videoView.isPlaying) {
+                holder.videoView.pause()
+                holder.btnBottomPlayPause.setImageResource(R.drawable.ic_modern_play)
+            }
+        }
+    } catch (e: Exception) {}
+
+    showFsCustomToast("Dosya gizleniyor...", 0)
 
     lifecycleScope.launch(Dispatchers.IO) {
         val db = AppDatabase.getDatabase(this@performHideMedia)
@@ -350,10 +454,14 @@ fun FullScreenActivity.performHideMedia() {
                 val originalDate = item.dateAdded * 1000L 
                 val destFile = File(hiddenFolder, "${System.currentTimeMillis()}_${sourceFile.name}")
                 
-                FileInputStream(sourceFile).use { input ->
-                    FileOutputStream(destFile).use { output ->
-                        input.copyTo(output)
+                val moved = sourceFile.renameTo(destFile)
+                if (!moved) {
+                    FileInputStream(sourceFile).use { input ->
+                        FileOutputStream(destFile).use { output ->
+                            input.copyTo(output)
+                        }
                     }
+                    sourceFile.delete()
                 }
                 
                 if (destFile.exists()) {
@@ -368,7 +476,6 @@ fun FullScreenActivity.performHideMedia() {
                     )
                     db.hiddenMediaDao().insert(hiddenEntry)
 
-                    sourceFile.delete()
                     contentResolver.delete(item.uri, null, null)
                     success = true
                 }
@@ -378,7 +485,7 @@ fun FullScreenActivity.performHideMedia() {
         withContext(Dispatchers.Main) {
             if (success) {
                 val msg = if (item.isVideo) "1 video gizlendi" else "1 fotoğraf gizlendi"
-                showFsCustomToast(msg, android.R.drawable.ic_secure)
+                showFsCustomToast(msg, 0)
                 
                 MainActivity.mediaList.remove(item)
                 MainActivity.displayedMediaList.removeAt(currentPosition)
@@ -392,7 +499,7 @@ fun FullScreenActivity.performHideMedia() {
                 filmstripRecycler.adapter?.notifyDataSetChanged()
                 if (MainActivity.displayedMediaList.isEmpty()) finish()
             } else {
-                showFsCustomToast("Gizleme başarısız oldu", android.R.drawable.ic_menu_info_details)
+                showFsCustomToast("Gizleme başarısız oldu", 0)
             }
         }
     }
@@ -453,7 +560,7 @@ fun FullScreenActivity.showAlbumSelectionDialog(action: String, itemsToProcess: 
 }
 
 fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, destFolder: File) {
-    showFsCustomToast("İşlem başlatıldı...", android.R.drawable.ic_menu_info_details)
+    showFsCustomToast("İşlem başlatıldı...", 0)
     lifecycleScope.launch(Dispatchers.IO) {
         var pCount = 0
         var vCount = 0
@@ -462,11 +569,20 @@ fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, d
                 val source = File(item.path)
                 val dest = File(destFolder, source.name)
                 if (source.exists() && source.absolutePath != dest.absolutePath) {
-                    source.copyTo(dest, overwrite = true)
+                    val moved = source.renameTo(dest)
+                    if (!moved) {
+                        source.copyTo(dest, overwrite = true)
+                    }
+                    
+                    dest.setLastModified(source.lastModified())
+                    
                     android.media.MediaScannerConnection.scanFile(this@processCopyMove, arrayOf(dest.absolutePath), null, null)
                     
                     if (action == "MOVE") {
-                        source.delete()
+                        if (moved) {
+                        } else {
+                            source.delete()
+                        }
                         contentResolver.delete(item.uri, null, null)
                     }
                     if (item.isVideo) vCount++ else pCount++
@@ -481,7 +597,7 @@ fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, d
                 vCount > 0 -> "$vCount video $actionText"
                 else -> ""
             }
-            showFsCustomToast(msg, android.R.drawable.ic_menu_info_details)
+            showFsCustomToast(msg, 0)
             if (action == "MOVE") {
                 MainActivity.forceReload = true
                 finish()
@@ -489,6 +605,7 @@ fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, d
         }
     }
 }
+
 
 fun FullScreenActivity.showMoreMenu(view: View) {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
@@ -508,8 +625,11 @@ fun FullScreenActivity.showMoreMenu(view: View) {
     val popup = PopupWindow(menuLayout, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
     popup.elevation = 30f 
     
-    val options = mutableListOf("Ayrıntılar", "Gizle", "Kopyala", "Taşı", "Tarih ve saati düzenle", "Konumu düzenle")
     val item = MainActivity.displayedMediaList[currentPosition]
+    val isFavorite = MainActivity.favoritePaths.contains(item.path)
+    val favOption = if (isFavorite) "Favorilerden çıkar" else "Favorilere ekle"
+    
+    val options = mutableListOf("Ayrıntılar", "Gizle", favOption, "Albüme kopyala", "Albüme taşı", "Tarih ve saati düzenle", "Konumu düzenle")
     
     if (item.isVideo) { 
         options.add("Video oynatıcıda aç") 
@@ -525,16 +645,17 @@ fun FullScreenActivity.showMoreMenu(view: View) {
                 popup.dismiss()
                 when(opt) {
                     "Ayrıntılar" -> { showModernDetailsBottomSheet() }
-                    "Gizle" -> { performHideMedia() }
-                    "Kopyala" -> { showAlbumSelectionDialog("COPY", listOf(item)) }
-                    "Taşı" -> { showAlbumSelectionDialog("MOVE", listOf(item)) }
+                    "Gizle" -> { showHideConfirmationDialog(listOf(item)) }
+                    "Favorilere ekle", "Favorilerden çıkar" -> { toggleFavorite() }
+                    "Albüme kopyala" -> { showAlbumSelectionDialog("COPY", listOf(item)) }
+                    "Albüme taşı" -> { showAlbumSelectionDialog("MOVE", listOf(item)) }
                     "Tarih ve saati düzenle" -> { showDateEditDialog() }
                     "Konumu düzenle" -> { showLocationEditDialog(view, listOf(item)) }
                     "Video oynatıcıda aç" -> { 
                         try {
                             val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(item.uri, "video/*"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
                             startActivity(intent)
-                        } catch (e: Exception) { showFsCustomToast("Oynatıcı bulunamadı", android.R.drawable.ic_menu_info_details) }
+                        } catch (e: Exception) { showFsCustomToast("Oynatıcı bulunamadı", 0) }
                     }
                 }
             }
@@ -610,19 +731,27 @@ fun FullScreenActivity.saveNewDate(newTime: Long) {
     val item = MainActivity.displayedMediaList[currentPosition]
     val dateStr = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(java.util.Date(newTime))
     
-    showFsCustomToast("Tarih güncelleniyor...", android.R.drawable.ic_menu_info_details)
+    showFsCustomToast("Tarih güncelleniyor...", 0)
     
     lifecycleScope.launch(Dispatchers.IO) {
         val timeInSeconds = newTime / 1000L
         item.dateAdded = timeInSeconds
+        var isUpdated = false
         
         try {
             if (!item.isVideo) {
-                val exif = ExifInterface(item.path)
-                exif.setAttribute(ExifInterface.TAG_DATETIME, dateStr)
-                exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, dateStr)
-                exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, dateStr)
-                exif.saveAttributes()
+                val ext = File(item.path).extension.lowercase(Locale("tr"))
+                if (listOf("jpg", "jpeg", "png", "webp", "tif", "tiff", "gif").contains(ext)) {
+                    if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                        try {
+                            val exif = ExifInterface(item.path)
+                            exif.setAttribute(ExifInterface.TAG_DATETIME, dateStr)
+                            exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, dateStr)
+                            exif.setAttribute(ExifInterface.TAG_DATETIME_DIGITIZED, dateStr)
+                            exif.saveAttributes()
+                        } catch (e: Exception) {}
+                    }
+                }
             }
             
             File(item.path).setLastModified(newTime)
@@ -635,15 +764,16 @@ fun FullScreenActivity.saveNewDate(newTime: Long) {
             contentResolver.update(item.uri, values, null, null)
 
             MediaScannerConnection.scanFile(this@saveNewDate, arrayOf(item.path), null, null)
-
-            withContext(Dispatchers.Main) { 
-                showFsCustomToast("Tarih başarıyla güncellendi", android.R.drawable.ic_menu_info_details)
+            isUpdated = true
+        } catch (e: Exception) {}
+        
+        withContext(Dispatchers.Main) { 
+            if (isUpdated) {
+                showFsCustomToast("Tarih başarıyla güncellendi", 0)
                 MainActivity.mediaList.sortByDescending { it.dateAdded }
                 MainActivity.forceReload = true 
-            }
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) { 
-                showFsCustomToast("Hata: Tarih güncellenemedi", android.R.drawable.ic_menu_info_details)
+            } else {
+                showFsCustomToast("Hata: Tarih güncellenemedi", 0)
             }
         }
     }
@@ -832,102 +962,50 @@ fun FullScreenActivity.showInteractiveMapDialog(items: List<MediaItem>) {
     
     var selectedLat: Double? = null
     var selectedLng: Double? = null
+    var currentMarker: com.google.android.gms.maps.model.Marker? = null
+    var googleMapRef: com.google.android.gms.maps.GoogleMap? = null
     
-    val webView = android.webkit.WebView(this).apply {
+    val mapView = com.google.android.gms.maps.MapView(this).apply {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        webViewClient = android.webkit.WebViewClient()
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.setGeolocationEnabled(true)
-        
-        webChromeClient = object : android.webkit.WebChromeClient() {
-            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: android.webkit.GeolocationPermissions.Callback) {
-                callback.invoke(origin, true, false)
-            }
-        }
-
-        addJavascriptInterface(object {
-            @android.webkit.JavascriptInterface
-            fun onLocationPicked(lat: Double, lng: Double) {
-                selectedLat = lat
-                selectedLng = lng
-            }
-            @android.webkit.JavascriptInterface
-            fun showToast(msg: String) {
-                post { this@showInteractiveMapDialog.showFsCustomToast(msg, android.R.drawable.ic_menu_info_details) }
-            }
-        }, "Android")
-        
-        val html = """<!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>
-                html, body { height: 100%; margin: 0; padding: 0; background: #e5e5e5; }
-                #map { height: 100%; width: 100%; } 
-                .locate-btn { background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 50%; width: 44px; height: 44px; font-size: 22px; cursor: pointer; line-height: 44px; text-align: center; text-decoration: none; color: #333; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); margin-top: 15px !important; margin-right: 15px !important; }
-            </style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var map = L.map('map', {zoomControl: false}).setView([39.0, 35.0], 5);
-                L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    attribution: 'Google'
-                }).addTo(map);
-                
-                L.control.zoom({position: 'bottomright'}).addTo(map);
-                
-                var marker;
-                function updateMarker(lat, lng) {
-                    if(marker) map.removeLayer(marker);
-                    marker = L.marker([lat, lng], {draggable: true}).addTo(map);
-                    marker.on('dragend', function(e) {
-                        var pos = e.target.getLatLng();
-                        Android.onLocationPicked(pos.lat, pos.lng);
-                    });
-                    Android.onLocationPicked(lat, lng);
-                }
-                
-                var LocateControl = L.Control.extend({
-                    options: {position: 'topright'},
-                    onAdd: function(map) {
-                        var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-                        container.style.border = 'none';
-                        container.style.boxShadow = 'none';
-                        var button = L.DomUtil.create('a', 'locate-btn', container);
-                        button.innerHTML = '🎯';
-                        button.href = '#';
-                        button.onclick = function(e) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            Android.showToast("Konum aranıyor, lütfen bekleyin...");
-                            map.locate({setView: true, maxZoom: 16, enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
-                        };
-                        return container;
-                    }
-                });
-                map.addControl(new LocateControl());
-                
-                map.on('locationfound', function(e) {
-                    updateMarker(e.latlng.lat, e.latlng.lng);
-                });
-                map.on('locationerror', function(e) {
-                    Android.showToast("Konum bulunamadı. Cihazın GPS'inin açık olduğundan emin olun.");
-                });
-                map.on('click', function(e) {
-                    updateMarker(e.latlng.lat, e.latlng.lng);
-                });
-            </script>
-        </body>
-        </html>"""
-        loadDataWithBaseURL("https://app.local", html, "text/html", "UTF-8", null)
     }
-    layout.addView(webView)
+    
+    try {
+        mapView.onCreate(null)
+        mapView.onResume()
+        
+        mapView.getMapAsync { googleMap ->
+            googleMapRef = googleMap
+            if (ContextCompat.checkSelfPermission(this@showInteractiveMapDialog, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                googleMap.isMyLocationEnabled = true
+            }
+            
+            val turkey = com.google.android.gms.maps.model.LatLng(39.0, 35.0)
+            googleMap.moveCamera(com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(turkey, 5f))
+            
+            googleMap.setOnMapLongClickListener { latLng ->
+                if (currentMarker == null) {
+                    currentMarker = googleMap.addMarker(com.google.android.gms.maps.model.MarkerOptions().position(latLng).draggable(true))
+                } else {
+                    currentMarker?.position = latLng
+                }
+                selectedLat = latLng.latitude
+                selectedLng = latLng.longitude
+            }
+            
+            googleMap.setOnMarkerDragListener(object : com.google.android.gms.maps.GoogleMap.OnMarkerDragListener {
+                override fun onMarkerDragStart(marker: com.google.android.gms.maps.model.Marker) {}
+                override fun onMarkerDrag(marker: com.google.android.gms.maps.model.Marker) {}
+                override fun onMarkerDragEnd(marker: com.google.android.gms.maps.model.Marker) {
+                    selectedLat = marker.position.latitude
+                    selectedLng = marker.position.longitude
+                }
+            })
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    
+    layout.addView(mapView)
     
     val bottomBar = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -953,11 +1031,14 @@ fun FullScreenActivity.showInteractiveMapDialog(items: List<MediaItem>) {
         setPadding(0, 40, 0, 40)
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         setOnClickListener {
-            if (selectedLat != null && selectedLng != null) {
+            val finalLat = selectedLat ?: googleMapRef?.cameraPosition?.target?.latitude
+            val finalLng = selectedLng ?: googleMapRef?.cameraPosition?.target?.longitude
+            
+            if (finalLat != null && finalLng != null) {
                 dialog.dismiss()
-                updateLocationData(items, selectedLat!!, selectedLng!!)
+                updateLocationData(items, finalLat, finalLng)
             } else {
-                showFsCustomToast("Lütfen haritadan bir konum seçin", android.R.drawable.ic_menu_info_details)
+                showFsCustomToast("Lütfen haritadan bir konum seçin", 0)
             }
         }
     }
@@ -966,50 +1047,115 @@ fun FullScreenActivity.showInteractiveMapDialog(items: List<MediaItem>) {
     bottomBar.addView(btnSave)
     layout.addView(bottomBar)
 
+    dialog.setOnDismissListener {
+        try { mapView.onDestroy() } catch (e: Exception) {}
+    }
+
     dialog.setContentView(layout)
     dialog.show()
 }
 
 fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
-    showFsCustomToast("Konum temizleniyor...", android.R.drawable.ic_menu_info_details)
+    showFsCustomToast("Konum temizleniyor", 0)
     lifecycleScope.launch(Dispatchers.IO) {
         val item = items.first()
         var isCleaned = false
+        val originalLastModified = File(item.path).lastModified()
+        val originalDateAdded = item.dateAdded
 
-        // 1. Fiziksel olarak desteklenenlerin (JPG, PNG vb.) Exif verisini temizle
+        var realDateAdded = originalDateAdded
+        var realDateTaken = originalLastModified
+        try {
+            contentResolver.query(item.uri, arrayOf("date_added", "datetaken"), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val daIdx = cursor.getColumnIndex("date_added")
+                    val dtIdx = cursor.getColumnIndex("datetaken")
+                    if (daIdx >= 0 && !cursor.isNull(daIdx)) realDateAdded = cursor.getLong(daIdx)
+                    if (dtIdx >= 0 && !cursor.isNull(dtIdx)) realDateTaken = cursor.getLong(dtIdx)
+                }
+            }
+        } catch(e: Exception){}
+
         if (!item.isVideo) {
             val ext = File(item.path).extension.lowercase(Locale("tr"))
-            if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+            if (listOf("jpg", "jpeg", "png", "webp", "tif", "tiff", "gif").contains(ext)) {
                 try {
-                    val exif = ExifInterface(item.path)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, null)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, null)
-                    exif.saveAttributes()
+                    if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                        try {
+                            val exif = ExifInterface(item.path)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, null)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, null)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, null)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, null)
+                            exif.setAttribute(ExifInterface.TAG_GPS_TIMESTAMP, null)
+                            exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP, null)
+                            exif.saveAttributes()
+                        } catch(e: Exception) {}
+                    }
+                    
+                    File(item.path).setLastModified(originalLastModified)
+                    android.media.MediaScannerConnection.scanFile(this@clearLocationData, arrayOf(item.path), null) { _, uriToUpdate ->
+                        val finalUri = uriToUpdate ?: item.uri
+                        try {
+                            File(item.path).setLastModified(originalLastModified)
+                            val values = ContentValues().apply {
+                                putNull("latitude")
+                                putNull("longitude")
+                                put(MediaStore.MediaColumns.DATE_ADDED, realDateAdded)
+                                put(MediaStore.MediaColumns.DATE_MODIFIED, originalDateAdded)
+                                put(MediaStore.Images.Media.DATE_TAKEN, realDateTaken)
+                            }
+                            contentResolver.update(finalUri, values, null, null)
+                        } catch (e: Exception) {}
+                    }
                     isCleaned = true
                 } catch(e:Exception){}
             }
+        } else {
+            try {
+                val sourceFile = File(item.path)
+                val tempFile = File(sourceFile.parent, "temp_loc_clear_${System.currentTimeMillis()}_${sourceFile.name}")
+                
+                val success = modifyVideoLocationWithMuxer(sourceFile, tempFile, null, null)
+                
+                if (success) {
+                    tempFile.copyTo(sourceFile, overwrite = true)
+                    sourceFile.setLastModified(originalLastModified)
+                    tempFile.delete()
+                    android.media.MediaScannerConnection.scanFile(this@clearLocationData, arrayOf(sourceFile.absolutePath), null) { _, uriToUpdate ->
+                        val finalUri = uriToUpdate ?: item.uri
+                        try {
+                            sourceFile.setLastModified(originalLastModified)
+                            val values = ContentValues().apply {
+                                putNull("latitude")
+                                putNull("longitude")
+                                put(MediaStore.MediaColumns.DATE_ADDED, realDateAdded)
+                                put(MediaStore.MediaColumns.DATE_MODIFIED, originalDateAdded)
+                                put(MediaStore.Video.Media.DATE_TAKEN, realDateTaken)
+                            }
+                            contentResolver.update(finalUri, values, null, null)
+                        } catch (e: Exception) {}
+                    }
+                    isCleaned = true
+                } else {
+                    tempFile.delete()
+                }
+            } catch (e: Exception) {}
         }
 
-        // 2. Videolar ve diğer formatlar için MediaStore veritabanı temizliği
-        try {
-            val values = ContentValues().apply {
-                putNull("latitude")
-                putNull("longitude")
-            }
-            contentResolver.update(item.uri, values, null, null)
-            isCleaned = true
-        } catch (e: Exception) {}
-
-        // 3. Uygulamanın kendi önbelleğinden (cache) konumu sil
-        if (isCleaned || item.isVideo) {
+        if (isCleaned) {
             MainActivity.itemLocationCache.remove(item.path)
             MainActivity.geocodeCache.remove(item.path)
         }
 
         withContext(Dispatchers.Main) {
-            val itemType = if (item.isVideo) "Video" else "Fotoğraf"
-            showFsCustomToast("$itemType konum verileri temizlendi", android.R.drawable.ic_menu_info_details)
-            detailsDialog?.dismiss()
+            if (isCleaned) {
+                val typeStr = if (item.isVideo) "videonun" else "dosyanın"
+                showFsCustomToast("1 $typeStr konumu temizlendi", 0)
+                detailsDialog?.dismiss()
+            } else {
+                showFsCustomToast("Konum temizlenemedi", 0)
+            }
         }
     }
 }
@@ -1024,7 +1170,6 @@ fun convertFsDecimalToDMS(coord: Double): String {
 }
 
 fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, lng: Double) {
-    showFsCustomToast("Konum güncelleniyor...", android.R.drawable.ic_menu_info_details)
     lifecycleScope.launch(Dispatchers.IO) {
         val latStr = convertFsDecimalToDMS(lat)
         val lngStr = convertFsDecimalToDMS(lng)
@@ -1033,48 +1178,147 @@ fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, l
 
         val item = items.first()
         var isUpdated = false
+        val originalLastModified = File(item.path).lastModified()
+        val originalDateAdded = item.dateAdded
 
-        // 1. Fiziksel olarak desteklenenlere Exif verisini yaz
-        if (!item.isVideo) {
-            val ext = File(item.path).extension.lowercase(Locale("tr"))
-            if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
-                try {
-                    val exif = ExifInterface(item.path)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, latStr)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latRef)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, lngStr)
-                    exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lngRef)
-                    exif.saveAttributes()
-                    isUpdated = true
-                } catch(e:Exception){}
+        var hadLoc = false
+        val cachedLoc = MainActivity.itemLocationCache[item.path]
+        if (!cachedLoc.isNullOrEmpty()) {
+            hadLoc = true
+        } else {
+            try {
+                contentResolver.query(item.uri, arrayOf("latitude", "longitude"), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val latIdx = cursor.getColumnIndex("latitude")
+                        val lngIdx = cursor.getColumnIndex("longitude")
+                        if (latIdx >= 0 && lngIdx >= 0 && !cursor.isNull(latIdx) && !cursor.isNull(lngIdx)) {
+                            val cLat = cursor.getDouble(latIdx)
+                            val cLng = cursor.getDouble(lngIdx)
+                            if (cLat != 0.0 || cLng != 0.0) {
+                                hadLoc = true
+                            }
+                        }
+                    }
+                }
+            } catch(e: Exception){}
+            if (!hadLoc && !item.isVideo) {
+                val ext = File(item.path).extension.lowercase(Locale("tr"))
+                if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                    try {
+                        val exif = ExifInterface(item.path)
+                        val latLong = FloatArray(2)
+                        if (exif.getLatLong(latLong)) {
+                            hadLoc = true
+                        }
+                    } catch(e: Exception){}
+                }
             }
         }
 
-        // 2. Sistem veritabanında (MediaStore) videonun konumunu güncelle
-        try {
-            val values = ContentValues().apply {
-                put("latitude", lat)
-                put("longitude", lng)
-            }
-            contentResolver.update(item.uri, values, null, null)
-            isUpdated = true
-        } catch(e: Exception) {}
+        withContext(Dispatchers.Main) {
+            showFsCustomToast(if (hadLoc) "Konum güncelleniyor" else "Konum ekleniyor", 0)
+        }
 
-        // 3. Ayrıntılar menüsünde anında görünmesi için önbelleğe yaz
-        if (isUpdated || item.isVideo) {
+        var realDateAdded = originalDateAdded
+        var realDateTaken = originalLastModified
+        try {
+            contentResolver.query(item.uri, arrayOf("date_added", "datetaken"), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val daIdx = cursor.getColumnIndex("date_added")
+                    val dtIdx = cursor.getColumnIndex("datetaken")
+                    if (daIdx >= 0 && !cursor.isNull(daIdx)) realDateAdded = cursor.getLong(daIdx)
+                    if (dtIdx >= 0 && !cursor.isNull(dtIdx)) realDateTaken = cursor.getLong(dtIdx)
+                }
+            }
+        } catch(e: Exception){}
+
+        if (!item.isVideo) {
+            val ext = File(item.path).extension.lowercase(Locale("tr"))
+            if (listOf("jpg", "jpeg", "png", "webp", "tif", "tiff", "gif").contains(ext)) {
+                try {
+                    if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
+                        try {
+                            val exif = ExifInterface(item.path)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, latStr)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latRef)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, lngStr)
+                            exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, lngRef)
+                            exif.saveAttributes()
+                        } catch(e: Exception) {}
+                    }
+                    
+                    File(item.path).setLastModified(originalLastModified)
+                    android.media.MediaScannerConnection.scanFile(this@updateLocationData, arrayOf(item.path), null) { _, uriToUpdate ->
+                        val finalUri = uriToUpdate ?: item.uri
+                        try {
+                            File(item.path).setLastModified(originalLastModified)
+                            val values = ContentValues().apply {
+                                put("latitude", lat)
+                                put("longitude", lng)
+                                put(MediaStore.MediaColumns.DATE_ADDED, realDateAdded)
+                                put(MediaStore.MediaColumns.DATE_MODIFIED, originalDateAdded)
+                                put(MediaStore.Images.Media.DATE_TAKEN, realDateTaken)
+                            }
+                            contentResolver.update(finalUri, values, null, null)
+                        } catch(e: Exception) {}
+                    }
+                    isUpdated = true
+                } catch(e:Exception){}
+            }
+        } else {
+            try {
+                val sourceFile = File(item.path)
+                val tempFile = File(sourceFile.parent, "temp_loc_${System.currentTimeMillis()}_${sourceFile.name}")
+                
+                val success = modifyVideoLocationWithMuxer(sourceFile, tempFile, lat, lng)
+                
+                if (success) {
+                    tempFile.copyTo(sourceFile, overwrite = true)
+                    sourceFile.setLastModified(originalLastModified)
+                    tempFile.delete()
+                    android.media.MediaScannerConnection.scanFile(this@updateLocationData, arrayOf(sourceFile.absolutePath), null) { _, uriToUpdate ->
+                        val finalUri = uriToUpdate ?: item.uri
+                        try {
+                            sourceFile.setLastModified(originalLastModified)
+                            val values = ContentValues().apply {
+                                put("latitude", lat)
+                                put("longitude", lng)
+                                put(MediaStore.MediaColumns.DATE_ADDED, realDateAdded)
+                                put(MediaStore.MediaColumns.DATE_MODIFIED, originalDateAdded)
+                                put(MediaStore.Video.Media.DATE_TAKEN, realDateTaken)
+                            }
+                            contentResolver.update(finalUri, values, null, null)
+                        } catch(e: Exception) {}
+                    }
+                    isUpdated = true
+                } else {
+                    tempFile.delete()
+                }
+            } catch(e: Exception) {}
+        }
+
+        if (isUpdated) {
             MainActivity.itemLocationCache[item.path] = "$lat,$lng"
             MainActivity.geocodeCache.remove(item.path)
         }
 
         withContext(Dispatchers.Main) {
-            val itemType = if (item.isVideo) "Video" else "Fotoğraf"
-            showFsCustomToast("$itemType konumu başarıyla güncellendi", android.R.drawable.ic_menu_info_details)
-            detailsDialog?.dismiss()
+            if (isUpdated) {
+                val msg = if (hadLoc) {
+                    if (item.isVideo) "1 videonun konumu güncellendi" else "1 dosyanın konumu güncellendi"
+                } else {
+                    if (item.isVideo) "1 videoya konum eklendi" else "1 dosyaya konum eklendi"
+                }
+                showFsCustomToast(msg, 0)
+                detailsDialog?.dismiss()
+            } else {
+                val failStr = if (hadLoc) "güncellenemedi" else "eklenemedi"
+                showFsCustomToast("Konum $failStr", 0)
+            }
         }
     }
 }
 
-@Suppress("DEPRECATION")
 fun FullScreenActivity.showModernDetailsBottomSheet() {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
     val item = MainActivity.displayedMediaList[currentPosition]
@@ -1108,7 +1352,6 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
     var resolutionStr = "Bilinmiyor"
     var locationStr = "Bilinmiyor"
     
-    // ŞAHİN: Önce senin taze güncellediğin önbellekten (cache) kontrol edelim ki ayrıntıları açınca "Bilinmiyor" demesin!
     val cachedLoc = MainActivity.itemLocationCache[item.path]
     var tempLat: Double? = null
     var tempLng: Double? = null
@@ -1123,23 +1366,71 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
 
     try {
         if (item.isVideo) {
-            val retriever = MediaMetadataRetriever().apply { setDataSource(this@showModernDetailsBottomSheet, item.uri) }
-            val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt() ?: 0
-            val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt() ?: 0
-            if (w > 0 && h > 0) resolutionStr = "${w}x${h}  |  ${String.format("%.1f", (w * h) / 1000000.0)}MP"
-            
-            // Eğer önbellekte bulamadıysak eski usul dosyanın içine bakalım
             if (tempLat == null || tempLng == null) {
-                val locMeta = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
-                if (locMeta != null) {
-                    val matcher = Pattern.compile("([+-][0-9.]+)([+-][0-9.]+)").matcher(locMeta)
-                    if (matcher.find()) {
-                        tempLat = matcher.group(1)?.toDoubleOrNull()
-                        tempLng = matcher.group(2)?.toDoubleOrNull()
+                try {
+                    contentResolver.query(item.uri, arrayOf(MediaStore.Video.Media.LATITUDE, MediaStore.Video.Media.LONGITUDE), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val latIdx = cursor.getColumnIndex(MediaStore.Video.Media.LATITUDE)
+                            val lngIdx = cursor.getColumnIndex(MediaStore.Video.Media.LONGITUDE)
+                            if (latIdx >= 0 && lngIdx >= 0 && !cursor.isNull(latIdx) && !cursor.isNull(lngIdx)) {
+                                val lat = cursor.getDouble(latIdx)
+                                val lng = cursor.getDouble(lngIdx)
+                                if (lat != 0.0 || lng != 0.0) {
+                                    tempLat = lat
+                                    tempLng = lng
+                                }
+                            }
+                        }
                     }
+                } catch (e: Exception) {}
+            }
+            
+            if (tempLat == null || tempLng == null) {
+                var retriever: MediaMetadataRetriever? = null
+                try {
+                    retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(item.path)
+                    } catch(e: Exception) {
+                        retriever.setDataSource(this@showModernDetailsBottomSheet, item.uri)
+                    }
+                    
+                    val locMeta = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+                    if (locMeta != null) {
+                        val matcher = Pattern.compile("([+-][0-9]*\\.?[0-9]+)([+-][0-9]*\\.?[0-9]+)").matcher(locMeta)
+                        if (matcher.find()) {
+                            tempLat = matcher.group(1)?.toDoubleOrNull()
+                            tempLng = matcher.group(2)?.toDoubleOrNull()
+                        }
+                    }
+                    
+                    if (tempLat == null || tempLng == null) {
+                        val locMeta2 = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+                        if (locMeta2 != null) {
+                            val parts = locMeta2.split(" ")
+                            if (parts.size >= 2) {
+                                tempLat = parts[0].toDoubleOrNull()
+                                tempLng = parts[1].toDoubleOrNull()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                } finally {
+                    try { retriever?.release() } catch (e: Exception) {}
                 }
             }
-            retriever.release()
+            
+            try {
+                val retrieverRes = MediaMetadataRetriever()
+                try {
+                    retrieverRes.setDataSource(this@showModernDetailsBottomSheet, item.uri)
+                    val w = retrieverRes.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt() ?: 0
+                    val h = retrieverRes.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt() ?: 0
+                    if (w > 0 && h > 0) resolutionStr = "${w}x${h}  |  ${String.format("%.1f", (w * h) / 1000000.0)}MP"
+                } catch (e: Exception) {}
+                finally { try { retrieverRes.release() } catch (e: Exception) {} }
+            } catch (e: Exception) {}
+            
         } else {
             contentResolver.query(item.uri, arrayOf(MediaStore.Images.Media.WIDTH, MediaStore.Images.Media.HEIGHT), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
@@ -1151,24 +1442,32 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
             if (tempLat == null || tempLng == null) {
                 val ext = File(item.path).extension.lowercase(Locale("tr"))
                 if (listOf("jpg", "jpeg", "png", "webp").contains(ext)) {
-                    val exif = ExifInterface(item.path)
-                    val latLong = FloatArray(2)
-                    if (exif.getLatLong(latLong)) {
-                        tempLat = latLong[0].toDouble()
-                        tempLng = latLong[1].toDouble()
-                    }
+                    try {
+                        val exif = ExifInterface(item.path)
+                        val latLong = FloatArray(2)
+                        if (exif.getLatLong(latLong)) {
+                            tempLat = latLong[0].toDouble()
+                            tempLng = latLong[1].toDouble()
+                        }
+                    } catch (e: Exception) {}
                 }
             }
         }
         
-        // Elimizde nihai bir koordinat varsa (ister cache ister exif) haritadan adresini çekiyoruz
-        if (tempLat != null && tempLng != null) {
-            val geocoder = Geocoder(this@showModernDetailsBottomSheet, Locale.getDefault())
-            val addresses = geocoder.getFromLocation(tempLat, tempLng, 1)
-            if (!addresses.isNullOrEmpty()) {
-                locationStr = addresses[0].getAddressLine(0) ?: "$tempLat, $tempLng"
-            } else {
-                locationStr = "$tempLat, $tempLng"
+        val finalLat = tempLat
+        val finalLng = tempLng
+        
+        if (finalLat != null && finalLng != null) {
+            try {
+                val geocoder = Geocoder(this@showModernDetailsBottomSheet, Locale.getDefault())
+                val addresses = geocoder.getFromLocation(finalLat, finalLng, 1)
+                if (!addresses.isNullOrEmpty()) {
+                    locationStr = addresses[0].getAddressLine(0) ?: "$finalLat, $finalLng"
+                } else {
+                    locationStr = "$finalLat, $finalLng"
+                }
+            } catch (e: Exception) {
+                locationStr = "$finalLat, $finalLng"
             }
         }
     } catch (e: Exception) {}

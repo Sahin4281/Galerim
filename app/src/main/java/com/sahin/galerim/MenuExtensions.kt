@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -162,7 +163,7 @@ fun MainActivity.showRenameAlbumDialog(bucketId: Long?, locationName: String?, c
                 val currentCountText = mainTitle.text.toString().substringAfter("\n", "")
                 mainTitle.text = "$newName\n$currentCountText"
                 
-                loadAllMedia()
+                albumsRecycler.adapter?.notifyDataSetChanged()
                 dialog.dismiss()
             }
         }
@@ -232,7 +233,6 @@ fun MainActivity.showCoverPhotoPicker(bucketId: Long?, locationName: String?) {
 
     gridLayout.adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): androidx.recyclerview.widget.RecyclerView.ViewHolder {
-            // Güvenli bağlantı: Senin kendi sağlam tasarımını (item_media.xml) kullanıyoruz. LayoutParams çökmesi olmaz.
             val view = layoutInflater.inflate(R.layout.item_media, parent, false)
             return object : androidx.recyclerview.widget.RecyclerView.ViewHolder(view) {}
         }
@@ -242,14 +242,29 @@ fun MainActivity.showCoverPhotoPicker(bucketId: Long?, locationName: String?) {
             val view = holder.itemView
             
             val thumbnail = view.findViewById<ImageView>(R.id.mediaThumbnail)
-            
-            // Kapak seçimi ekranında gereksiz olan özellikleri güvenli bir şekilde gizliyoruz
-            view.findViewById<View>(R.id.videoInfoPanel)?.visibility = View.GONE
+            val videoInfoPanel = view.findViewById<View>(R.id.videoInfoPanel)
+            val tvDuration = view.findViewById<TextView>(R.id.videoDuration)
+
             view.findViewById<View>(R.id.selectionOverlay)?.visibility = View.GONE
             view.findViewById<View>(R.id.selectionCheck)?.visibility = View.GONE
             view.findViewById<View>(R.id.mediaTextureView)?.visibility = View.GONE
             
             thumbnail?.visibility = View.VISIBLE
+            
+            if (media.isVideo) {
+                videoInfoPanel?.visibility = View.VISIBLE
+                val duration = media.duration
+                val seconds = (duration / 1000) % 60
+                val minutes = (duration / (1000 * 60)) % 60
+                val hours = (duration / (1000 * 60 * 60))
+                tvDuration?.text = if (hours > 0) {
+                    String.format(java.util.Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+                } else {
+                    String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
+                }
+            } else {
+                videoInfoPanel?.visibility = View.GONE
+            }
             
             thumbnail?.let {
                 com.bumptech.glide.Glide.with(this@showCoverPhotoPicker)
@@ -261,7 +276,7 @@ fun MainActivity.showCoverPhotoPicker(bucketId: Long?, locationName: String?) {
             view.setOnClickListener {
                 val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
                 prefs.edit().putString("custom_cover_${bucketId ?: locationName}", media.uri.toString()).apply()
-                loadAllMedia()
+                albumsRecycler.adapter?.notifyDataSetChanged()
                 showCustomToast(this@showCoverPhotoPicker, "Kapak fotoğrafı başarıyla değiştirildi", R.drawable.ic_action_check)
                 dialog.dismiss()
             }
@@ -371,6 +386,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     var isOpeningSubMenu = false
 
     view.findViewById<View>(R.id.menu_item_places)?.setOnClickListener {
+        currentlyPlayingPosition = -1
+        releaseMediaPlayer()
         resetStates()
         isShowingPlaces = true
         bottomSheetMenu?.dismiss()
@@ -380,6 +397,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     }
 
     view.findViewById<View>(R.id.menu_item_locations)?.setOnClickListener {
+        currentlyPlayingPosition = -1
+        releaseMediaPlayer()
         resetStates()
         isShowingLocations = true
         bottomSheetMenu?.dismiss()
@@ -389,6 +408,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     }
 
     view.findViewById<View>(R.id.menu_item_favorites)?.setOnClickListener {
+        currentlyPlayingPosition = -1
+        releaseMediaPlayer()
         resetStates()
         isShowingFavorites = true
         bottomSheetMenu?.dismiss()
@@ -396,6 +417,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     }
 
     view.findViewById<View>(R.id.menu_item_trash)?.setOnClickListener {
+        currentlyPlayingPosition = -1
+        releaseMediaPlayer()
         resetStates()
         isShowingTrash = true
         bottomSheetMenu?.dismiss()
@@ -431,6 +454,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
         isShowingPlaces = false
         isShowingLocations = false
         
+        currentlyPlayingPosition = -1
+        releaseMediaPlayer()
         bottomSheetMenu?.dismiss()
         
         revertTabAndRestoreContext {
@@ -636,7 +661,10 @@ fun MainActivity.showAppearanceBottomSheet() {
             setPadding(32, 0, 32, 0)
 
             setOnClickListener {
-                prefs.edit().putString("appTheme", t).apply()
+                prefs.edit()
+                    .putString("appTheme", t)
+                    .putString("bg_type", "default")
+                    .apply()
                 appearanceBottomSheetMenu?.dismiss()
                 recreate()
             }
@@ -824,7 +852,8 @@ fun MainActivity.showAppearanceBottomSheet() {
     }
     galleryFrame.setOnClickListener {
         appearanceBottomSheetMenu?.dismiss()
-        this@showAppearanceBottomSheet.bgImagePickerLauncher.launch(arrayOf("image/*"))
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        this@showAppearanceBottomSheet.bgImagePickerLauncher.launch(intent)
     }
     if (currentBgType == "image") {
         galleryFrame.background = GradientDrawable().apply {

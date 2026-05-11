@@ -8,9 +8,11 @@
     android:background="@color/p_app_background"
     android:orientation="vertical">
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:padding="16dp">
 
         <ImageView
@@ -18,30 +20,36 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:src="?attr/homeAsUpIndicator"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
             app:tint="@color/p_app_icon_tint" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvHiddenTitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
             android:text="Gizli Klasör"
             android:textColor="@color/p_app_text_primary"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btnSelectAll"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
             android:text="Hepsini Seç"
             android:textColor="@color/p_app_text_primary"
             android:textSize="16sp"
             android:textStyle="bold"
             android:padding="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
             android:visibility="gone" />
-    </RelativeLayout>
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -57,19 +65,30 @@
 
         <LinearLayout
             android:id="@+id/emptyView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
+            android:padding="32dp"
             android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Gizli öğe yok"
+                android:text="Burası boş."
+                android:textColor="@color/p_app_text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Gizlemek istediğiniz fotoğraf ve videoları tam ekranda alt köşedeki üç noktaya, sonrasında Gizle'ye dokunarak gizleyebilirsiniz. Birden fazla fotoğraf ve videoyu gizlemek için, ızgara görünümünde bir dosya üzerine basılı tutarak dosyaları seçtikten sonra alt köşedeki üç noktaya, sonrasında Gizle'ye dokunarak gizleyebilirsiniz. Gizli klasörden çıkarmak istediğiniz fotoğraf ve videoyu tam ekranda yada çoklu seçimde alttaki Geri Yükle butonuna dokunarak gizli klasörden çıkarabilirsiniz."
                 android:textColor="@color/p_app_text_secondary"
-                android:textSize="16sp" />
+                android:textSize="14sp"
+                android:textAlignment="center"
+                android:lineSpacingExtra="4dp" />
         </LinearLayout>
     </FrameLayout>
 
@@ -79,10 +98,9 @@
         android:layout_height="wrap_content"
         android:background="@color/p_app_background"
         android:orientation="horizontal"
-        android:paddingTop="12dp"
-        android:paddingBottom="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
         android:visibility="gone"
-        android:elevation="10dp"
         android:weightSum="2">
 
         <LinearLayout
@@ -92,22 +110,23 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="?attr/selectableItemBackground"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
-            android:focusable="true"
-            android:padding="8dp">
+            android:focusable="true">
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
+                android:id="@+id/ivRestoreIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:src="@drawable/ic_undo"
                 app:tint="@color/p_app_icon_tint" />
             <TextView
+                android:id="@+id/tvRestoreText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:text="Geri Yükle"
                 android:textColor="@color/p_app_text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -117,23 +136,23 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="?attr/selectableItemBackground"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
-            android:focusable="true"
-            android:padding="8dp">
+            android:focusable="true">
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
+                android:id="@+id/ivDeleteIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:src="@drawable/ic_delete_outline"
                 app:tint="#FF5252" />
             <TextView
+                android:id="@+id/tvDeleteText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:text="Kalıcı Sil"
                 android:textColor="#FF5252"
-                android:textStyle="bold"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 

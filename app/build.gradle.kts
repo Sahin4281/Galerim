@@ -1,8 +1,7 @@
 plugins {
     id("com.android.application")
     kotlin("android")
-    kotlin("kapt") // <--- BU SATIRI EKLE
-    // ... diğer pluginler varsa buraya ...
+    kotlin("kapt")
 }
 
 android {
@@ -30,7 +29,6 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Telefonun imzasız APK'yı reddetmemesi ve sorunsuz kurması için eklendi:
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -62,4 +60,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.exifinterface:exifinterface:1.3.6")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 }

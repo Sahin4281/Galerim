@@ -206,6 +206,7 @@ class MainActivity : AppCompatActivity() {
     var previousTabPosition = 0
     val autoPlayHandler = Handler(Looper.getMainLooper())
     var currentlyPlayingPosition = -1
+    var currentlyPlayingMediaPath: String? = null
     var mediaPlayer: MediaPlayer? = null
     var isActivityResumed = false
     
@@ -273,19 +274,34 @@ class MainActivity : AppCompatActivity() {
                                 nextPos = visibleItems[currentIndex + 1]
                             }
 
-                            if (nextPos != currentlyPlayingPosition || currentlyPlayingPosition == -1) {
+                            val currentItem = if (currentlyPlayingPosition in galleryItems.indices) galleryItems[currentlyPlayingPosition] else null
+                            val expectedPath = (currentItem as? MediaContentItem)?.media?.path
+
+                            if (nextPos != currentlyPlayingPosition || currentlyPlayingPosition == -1 || expectedPath != currentlyPlayingMediaPath) {
                                 val oldPos = currentlyPlayingPosition
                                 currentlyPlayingPosition = nextPos
+                                val nextItem = if (nextPos in galleryItems.indices) galleryItems[nextPos] else null
+                                currentlyPlayingMediaPath = (nextItem as? MediaContentItem)?.media?.path
+
                                 releaseMediaPlayer()
-                                if (oldPos != -1) allRecycler.adapter?.notifyItemChanged(oldPos)
-                                allRecycler.adapter?.notifyItemChanged(currentlyPlayingPosition)
+                                val itemCount = allRecycler.adapter?.itemCount ?: 0
+                                if (oldPos != -1 && oldPos < itemCount) {
+                                    allRecycler.adapter?.notifyItemChanged(oldPos)
+                                }
+                                if (currentlyPlayingPosition != -1 && currentlyPlayingPosition < itemCount) {
+                                    allRecycler.adapter?.notifyItemChanged(currentlyPlayingPosition)
+                                }
                             }
                         } else {
                             if (currentlyPlayingPosition != -1) {
                                 val oldPos = currentlyPlayingPosition
                                 currentlyPlayingPosition = -1
+                                currentlyPlayingMediaPath = null
                                 releaseMediaPlayer()
-                                allRecycler.adapter?.notifyItemChanged(oldPos)
+                                val itemCount = allRecycler.adapter?.itemCount ?: 0
+                                if (oldPos != -1 && oldPos < itemCount) {
+                                    allRecycler.adapter?.notifyItemChanged(oldPos)
+                                }
                             }
                         }
                     }
@@ -365,7 +381,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnTrashEdit)?.setOnClickListener {
             if (!isSelectionMode && trashList.isNotEmpty()) {
                 isSelectionMode = true
+                val oldPos = currentlyPlayingPosition
                 currentlyPlayingPosition = -1
+                currentlyPlayingMediaPath = null
                 releaseMediaPlayer()
                 updateSelectionUI()
                 allRecycler.adapter?.notifyDataSetChanged()
@@ -375,9 +393,19 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnTrashMore)?.setOnClickListener { showTrashMoreMenu(it) }
         
         setupElegantBottomTabs()
+        
+        bottomTabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                enableSideMenu(false)
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
+        
         setupSelectionButtons()
         setupFastScroller()
         setupSearchFunctionality()
+        setupSideMenu()
         
         val itemAnimator = allRecycler.itemAnimator
         if (itemAnimator is androidx.recyclerview.widget.SimpleItemAnimator) {
@@ -389,7 +417,7 @@ class MainActivity : AppCompatActivity() {
         layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int {
                 val item = galleryItems.getOrNull(position)
-                return if (item is HeaderItem) spanCount else 1
+                return if (item is HeaderItem) layoutManager.spanCount else 1
             }
         }
         
@@ -436,6 +464,8 @@ class MainActivity : AppCompatActivity() {
                     findViewById<View>(R.id.albumStickyHeader)?.visibility = View.GONE
                     mainTitle.visibility = View.GONE
                     topIconsContainer.visibility = View.GONE
+                    
+                    enableSideMenu(false)
                     
                 } else if (isShowingTrash || isShowingFavorites || isShowingPlaces || isShowingLocations) { 
                     resetStates()
@@ -531,9 +561,11 @@ class MainActivity : AppCompatActivity() {
 
         val oldPos = currentlyPlayingPosition
         currentlyPlayingPosition = -1
+        currentlyPlayingMediaPath = null
         releaseMediaPlayer()
         
-        if (oldPos != -1) {
+        val itemCount = allRecycler.adapter?.itemCount ?: 0
+        if (oldPos != -1 && oldPos < itemCount) {
             allRecycler.adapter?.notifyItemChanged(oldPos)
         }
     }
@@ -562,14 +594,16 @@ class MainActivity : AppCompatActivity() {
         } 
     }
 
-    val bgImagePickerLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        uri?.let {
-            try {
-                contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (e: Throwable) {}
-            val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("bg_type", "image").putString("bg_image", it.toString()).apply()
-            applyDynamicColorsToUI()
+    val bgImagePickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                try {
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e: Throwable) {}
+                val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+                prefs.edit().putString("bg_type", "image").putString("bg_image", uri.toString()).apply()
+                applyDynamicColorsToUI()
+            }
         }
     }
 

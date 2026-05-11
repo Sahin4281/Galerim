@@ -34,9 +34,11 @@ fun MainActivity.applyDynamicColorsToUI() {
     val bgType = prefs.getString("bg_type", "default")
     
     var isDarkBg = true
+    var dynamicBarColor = actualBg
     
     if (bgType == "color") {
         val customColor = prefs.getInt("bg_color", actualBg)
+        dynamicBarColor = customColor
         rootView?.setBackgroundColor(customColor)
         
         val r = Color.red(customColor)
@@ -44,6 +46,7 @@ fun MainActivity.applyDynamicColorsToUI() {
         val b = Color.blue(customColor)
         isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
     } else if (bgType == "image") {
+        dynamicBarColor = Color.TRANSPARENT
         val imageUriStr = prefs.getString("bg_image", null)
         var bgSet = false
         if (imageUriStr != null) {
@@ -117,11 +120,14 @@ fun MainActivity.applyDynamicColorsToUI() {
                     val g = Color.green(avgColor)
                     val b = Color.blue(avgColor)
                     isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
+                    
+                    dynamicBarColor = if (isDarkBg) Color.parseColor("#99000000") else Color.parseColor("#99FFFFFF")
                 }
             } catch (e: Throwable) { 
             }
         }
         if (!bgSet) {
+            dynamicBarColor = actualBg
             rootView?.setBackgroundColor(actualBg)
             val r = Color.red(actualBg)
             val g = Color.green(actualBg)
@@ -129,6 +135,7 @@ fun MainActivity.applyDynamicColorsToUI() {
             isDarkBg = ((0.299 * r + 0.587 * g + 0.114 * b) / 255.0) < 0.6
         }
     } else {
+        dynamicBarColor = actualBg
         rootView?.setBackgroundColor(actualBg)
         val r = Color.red(actualBg)
         val g = Color.green(actualBg)
@@ -139,29 +146,30 @@ fun MainActivity.applyDynamicColorsToUI() {
     val adaptiveTextColor = if (isDarkBg) Color.WHITE else Color.BLACK
     prefs.edit().putInt("dynamic_text_color", adaptiveTextColor).apply()
     
-    activity.findViewById<View>(R.id.searchContainer)?.setBackgroundColor(actualBg)
+    val adaptiveSecondaryColor = Color.argb(178, Color.red(adaptiveTextColor), Color.green(adaptiveTextColor), Color.blue(adaptiveTextColor))
     
-    activity.trashTopBar.setBackgroundColor(actualBg)
-    activity.favoritesTopBar.setBackgroundColor(actualBg)
-    activity.selectionTopBar.setBackgroundColor(actualBg)
-    activity.selectionBottomBar.setBackgroundColor(actualBg)
-    activity.bottomTabLayout.setBackgroundColor(actualBg)
+    activity.findViewById<View>(R.id.searchContainer)?.setBackgroundColor(dynamicBarColor)
     
-    // Yeni eklediğimiz başlıkların renk ayarları
+    activity.trashTopBar.setBackgroundColor(dynamicBarColor)
+    activity.favoritesTopBar.setBackgroundColor(dynamicBarColor)
+    activity.selectionTopBar.setBackgroundColor(dynamicBarColor)
+    activity.selectionBottomBar.setBackgroundColor(dynamicBarColor)
+    activity.bottomTabLayout.setBackgroundColor(dynamicBarColor)
+    
     activity.mainTitle.setTextColor(adaptiveTextColor)
-    activity.findViewById<TextView>(R.id.subTitle)?.setTextColor(secondaryColor)
+    activity.findViewById<TextView>(R.id.subTitle)?.setTextColor(adaptiveSecondaryColor)
     
     (activity.topIconsContainer as? ViewGroup)?.let { container ->
         for (i in 0 until container.childCount) {
             val child = container.getChildAt(i)
             if (child is ImageView) {
-                child.setColorFilter(iconTint)
+                child.setColorFilter(adaptiveTextColor)
             }
         }
     }
     
-    activity.tvSelectionCount.setTextColor(primaryColor)
-    activity.findViewById<ImageView>(R.id.btnCloseSelection)?.setColorFilter(iconTint)
+    activity.tvSelectionCount.setTextColor(adaptiveTextColor)
+    activity.findViewById<ImageView>(R.id.btnCloseSelection)?.setColorFilter(adaptiveTextColor)
     
     activity.fastScrollThumb.background = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
@@ -174,36 +182,38 @@ fun MainActivity.applyDynamicColorsToUI() {
     val isAccentWhite = accentColor == Color.WHITE || accentColor == Color.parseColor("#FFFFFF")
     activity.fastScrollBubble.setTextColor(if (isAccentWhite) Color.BLACK else Color.WHITE)
     
-    activity.findViewById<ImageView>(R.id.btnSearchBack)?.setColorFilter(iconTint)
-    activity.findViewById<ImageView>(R.id.btnClearSearch)?.setColorFilter(iconTint)
+    activity.findViewById<ImageView>(R.id.btnSearchBack)?.setColorFilter(adaptiveTextColor)
+    activity.findViewById<ImageView>(R.id.btnClearSearch)?.setColorFilter(adaptiveTextColor)
     
     val btnSelectAllLayout = activity.findViewById<LinearLayout>(R.id.btnSelectAll)
-    (btnSelectAllLayout?.getChildAt(0) as? TextView)?.setTextColor(primaryColor)
+    (btnSelectAllLayout?.getChildAt(0) as? TextView)?.setTextColor(adaptiveTextColor)
     
-    activity.findViewById<ImageView>(R.id.ivShareIcon)?.setColorFilter(iconTint)
-    activity.findViewById<TextView>(R.id.tvShareText)?.setTextColor(primaryColor)
+    activity.findViewById<ImageView>(R.id.ivShareIcon)?.setColorFilter(adaptiveTextColor)
+    activity.findViewById<TextView>(R.id.tvShareText)?.setTextColor(adaptiveTextColor)
     
     activity.findViewById<ImageView>(R.id.ivRestoreIcon)?.setColorFilter(Color.parseColor("#4CAF50"))
     activity.findViewById<TextView>(R.id.tvRestoreText)?.setTextColor(Color.parseColor("#4CAF50"))
     
-    activity.findViewById<ImageView>(R.id.ivMoreIcon)?.setColorFilter(iconTint)
-    activity.findViewById<TextView>(R.id.tvMoreText)?.setTextColor(primaryColor)
+    activity.findViewById<ImageView>(R.id.ivMoreIcon)?.setColorFilter(adaptiveTextColor)
+    activity.findViewById<TextView>(R.id.tvMoreText)?.setTextColor(adaptiveTextColor)
     
     activity.findViewById<View>(R.id.btnBackFromTrash)?.let {
-        if (it is ViewGroup && it.childCount > 0) {
-            (it.getChildAt(0) as? TextView)?.setTextColor(iconTint)
+        if (it is ViewGroup && it.childCount > 1) {
+            (it.getChildAt(0) as? ImageView)?.setColorFilter(adaptiveTextColor)
+            (it.getChildAt(1) as? TextView)?.setTextColor(adaptiveTextColor)
         }
     }
     
     activity.findViewById<View>(R.id.btnBackFromFavorites)?.let {
-        if (it is ViewGroup && it.childCount > 0) {
-            (it.getChildAt(0) as? TextView)?.setTextColor(iconTint)
+        if (it is ViewGroup && it.childCount > 1) {
+            (it.getChildAt(0) as? ImageView)?.setColorFilter(adaptiveTextColor)
+            (it.getChildAt(1) as? TextView)?.setTextColor(adaptiveTextColor)
         }
     }
     
-    activity.findViewById<TextView>(R.id.tvTrashTitleCount)?.setTextColor(secondaryColor)
-    activity.findViewById<TextView>(R.id.btnTrashEdit)?.setTextColor(primaryColor)
-    activity.findViewById<ImageView>(R.id.btnTrashMore)?.setColorFilter(iconTint)
+    activity.findViewById<TextView>(R.id.tvTrashTitleCount)?.setTextColor(adaptiveSecondaryColor)
+    activity.findViewById<TextView>(R.id.btnTrashEdit)?.setTextColor(adaptiveTextColor)
+    activity.findViewById<ImageView>(R.id.btnTrashMore)?.setColorFilter(adaptiveTextColor)
     
     (activity.emptyTrashView as? LinearLayout)?.let { layout ->
         for (i in 0 until layout.childCount) {
@@ -232,9 +242,10 @@ fun MainActivity.applyDynamicColorsToUI() {
         ivSelectAll?.imageTintList = null
     } else {
         ivSelectAll?.setImageResource(R.drawable.ic_check_circle_off)
-        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
+        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(adaptiveTextColor)
     }
     
+    activity.updateTabAppearance(activity.bottomTabLayout.selectedTabPosition)
     activity.allRecycler.adapter?.notifyDataSetChanged()
     activity.albumsRecycler.adapter?.notifyDataSetChanged()
 }
@@ -271,7 +282,15 @@ fun MainActivity.updateEmptyStateUI() {
             btnTrashMore?.visibility = View.GONE
         } else {
             tvTrashTitleCount?.visibility = View.VISIBLE
-            tvTrashTitleCount?.text = "${MainActivity.trashList.size} görüntü"
+            val photoCount = MainActivity.trashList.count { !it.isVideo }
+            val videoCount = MainActivity.trashList.count { it.isVideo }
+            val countText = when {
+                photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf $videoCount video"
+                videoCount > 0 -> "$videoCount video"
+                photoCount > 0 -> "$photoCount fotoğraf"
+                else -> "Burası boş."
+            }
+            tvTrashTitleCount?.text = countText
             activity.emptyTrashView.visibility = View.GONE
             coordinatorLayout?.visibility = View.VISIBLE
             activity.allRecycler.visibility = View.VISIBLE
@@ -374,8 +393,8 @@ fun MainActivity.updateSelectionUI() {
     val ivDeleteIcon = activity.findViewById<ImageView>(R.id.ivDeleteIcon)
     val tvDeleteText = activity.findViewById<TextView>(R.id.tvDeleteText)
     
-    val iconTint = ContextCompat.getColor(activity, R.color.p_app_icon_tint)
-    val primaryColor = ContextCompat.getColor(activity, R.color.p_app_text_primary)
+    val prefs = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val adaptiveColor = prefs.getInt("dynamic_text_color", Color.WHITE)
     
     if (activity.isShowingTrash) {
         btnShare?.visibility = View.GONE
@@ -392,8 +411,8 @@ fun MainActivity.updateSelectionUI() {
         btnRestore?.visibility = View.GONE
         
         ivDeleteIcon?.setImageResource(R.drawable.ic_action_delete)
-        ivDeleteIcon?.setColorFilter(iconTint)
-        tvDeleteText?.setTextColor(primaryColor)
+        ivDeleteIcon?.setColorFilter(adaptiveColor)
+        tvDeleteText?.setTextColor(adaptiveColor)
         tvDeleteText?.text = "Sil"
     }
 
@@ -403,7 +422,7 @@ fun MainActivity.updateSelectionUI() {
         ivSelectAll?.imageTintList = null
     } else {
         ivSelectAll?.setImageResource(R.drawable.ic_check_circle_off)
-        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(iconTint)
+        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(adaptiveColor)
     }
 }
 
@@ -411,7 +430,6 @@ fun MainActivity.resetStates() {
     val activity = this
     if (activity.bottomTabLayout.tag == "restoring") return
     
-    // Geri çıkıldığında yeni XML başlığının kusursuz kapanması için
     activity.findViewById<LinearLayout>(R.id.albumStickyHeader)?.visibility = View.GONE
     activity.mainTitle.visibility = View.GONE
     activity.topIconsContainer.visibility = View.GONE
@@ -436,12 +454,23 @@ fun MainActivity.resetStates() {
 
 fun MainActivity.updateTabAppearance(selectedPos: Int) {
     val activity = this
-    val primaryColor = ContextCompat.getColor(activity, R.color.p_app_text_primary)
+    val prefs = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val adaptiveColor = prefs.getInt("dynamic_text_color", Color.WHITE)
+    val isImageBg = prefs.getString("bg_type", "default") == "image"
+    
+    val unselectedColor = Color.argb(160, Color.red(adaptiveColor), Color.green(adaptiveColor), Color.blue(adaptiveColor))
+    val shadowColor = if (adaptiveColor == Color.WHITE) Color.parseColor("#B3000000") else Color.parseColor("#B3FFFFFF")
     
     for (i in 0 until activity.bottomTabLayout.tabCount) {
         val tv = activity.bottomTabLayout.getTabAt(i)?.customView as? TextView
-        tv?.setTextColor(if (i == selectedPos) primaryColor else Color.parseColor("#888888"))
+        tv?.setTextColor(if (i == selectedPos) adaptiveColor else unselectedColor)
         tv?.setTypeface(null, if (i == selectedPos) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+        
+        if (isImageBg) {
+            tv?.setShadowLayer(6f, 0f, 2f, shadowColor)
+        } else {
+            tv?.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+        }
     }
 }
 
@@ -482,7 +511,8 @@ fun MainActivity.showMultiDeleteConfirmationDialog(items: List<MediaItem>) {
     val activity = this
     val useTrashPref = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE).getBoolean("useTrash", true)
     val actuallyUseTrash = useTrashPref && !activity.isShowingTrash
-    val primaryColor = ContextCompat.getColor(activity, R.color.p_app_text_primary)
+    val prefs = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val adaptiveColor = prefs.getInt("dynamic_text_color", Color.WHITE)
     val menuBgColor = activity.getMenuBgColor()
     
     val dialog = BottomSheetDialog(activity)
@@ -499,7 +529,7 @@ fun MainActivity.showMultiDeleteConfirmationDialog(items: List<MediaItem>) {
     
     val messageView = view.findViewById<TextView>(R.id.dialogMessage)
     messageView.gravity = Gravity.CENTER
-    messageView.setTextColor(primaryColor)
+    messageView.setTextColor(adaptiveColor)
 
     var photoCount = 0
     var videoCount = 0
@@ -613,10 +643,16 @@ fun MainActivity.updateAccentColor(color: Int) {
     val isAccentWhite = color == Color.WHITE || color == Color.parseColor("#FFFFFF")
     activity.fastScrollBubble.setTextColor(if (isAccentWhite) Color.BLACK else Color.WHITE)
     
+    val prefs = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val adaptiveColor = prefs.getInt("dynamic_text_color", Color.WHITE)
+    
     val ivSelectAll = activity.findViewById<ImageView>(R.id.ivSelectAllIcon)
     if (activity.selectedMedia.size == MainActivity.displayedMediaList.size && MainActivity.displayedMediaList.isNotEmpty()) {
         ivSelectAll?.setImageDrawable(CheckCircleDrawable(color))
         ivSelectAll?.imageTintList = null
+    } else {
+        ivSelectAll?.setImageResource(R.drawable.ic_check_circle_off)
+        ivSelectAll?.imageTintList = android.content.res.ColorStateList.valueOf(adaptiveColor)
     }
     
     activity.allRecycler.adapter?.notifyDataSetChanged()

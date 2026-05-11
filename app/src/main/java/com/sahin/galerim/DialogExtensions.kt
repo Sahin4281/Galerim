@@ -8,10 +8,13 @@ import android.location.Geocoder
 import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AlphaAnimation
 import android.widget.*
 import androidx.appcompat.widget.AppCompatButton
 import androidx.core.content.ContextCompat
@@ -116,6 +119,90 @@ fun MainActivity.showAlbumSelectionDialog(action: String, itemsToProcess: List<M
     dialog.show()
 }
 
+fun MainActivity.showHideConfirmationDialog(items: List<MediaItem>) {
+    val activity = this
+    val primaryColor = ContextCompat.getColor(activity, R.color.p_app_text_primary)
+    val menuBgColor = getMenuBgColor()
+    
+    val dialog = BottomSheetDialog(activity)
+    val view = activity.layoutInflater.inflate(R.layout.dialog_trash_confirmation, null)
+    dialog.setContentView(view)
+    
+    view.background = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = 60f
+        setColor(menuBgColor)
+    }
+    
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    
+    val messageView = view.findViewById<TextView>(R.id.dialogMessage)
+    messageView.gravity = Gravity.CENTER
+    messageView.setTextColor(primaryColor)
+
+    var photoCount = 0
+    var videoCount = 0
+    
+    items.forEach { 
+        if (it.isVideo) videoCount++ else photoCount++ 
+    }
+    
+    val itemsText = when {
+        photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf ve $videoCount video"
+        photoCount > 0 -> "$photoCount fotoğraf"
+        videoCount > 0 -> "$videoCount video"
+        else -> ""
+    }
+    
+    messageView.text = "$itemsText gizli klasöre taşınsın mı?"
+    
+    val btnConfirm = view.findViewById<AppCompatButton>(R.id.btnConfirm)
+    val parentLayout = btnConfirm.parent as? ViewGroup
+    
+    if (parentLayout is LinearLayout) {
+        parentLayout.removeAllViews()
+        parentLayout.gravity = Gravity.CENTER
+        
+        val dp10 = (10 * activity.resources.displayMetrics.density).toInt()
+        val btnWidth = (110 * activity.resources.displayMetrics.density).toInt() 
+        val btnHeight = (42 * activity.resources.displayMetrics.density).toInt()
+        
+        val btnCancelNew = AppCompatButton(activity).apply {
+            text = "İptal"
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#4CAF50")) 
+                cornerRadius = 30f
+            }
+            layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginEnd = dp10 }
+            setOnClickListener { dialog.dismiss() }
+        }
+        
+        val btnConfirmNew = AppCompatButton(activity).apply {
+            text = "Gizle"
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#FF5252")) 
+                cornerRadius = 30f
+            }
+            layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginStart = dp10 }
+            setOnClickListener {
+                dialog.dismiss()
+                activity.performHideMedia(items)
+            }
+        }
+        
+        parentLayout.addView(btnCancelNew)
+        parentLayout.addView(btnConfirmNew)
+    }
+
+    dialog.show()
+}
+
 fun MainActivity.showSelectionMoreMenu() {
     val activity = this
     val btnMore = findViewById<View>(R.id.btnMore) ?: return
@@ -174,7 +261,7 @@ fun MainActivity.showSelectionMoreMenu() {
                         }
                         
                         exitSelectionMode()
-                        if (msg.isNotEmpty()) showCustomToast(activity, msg, 0)
+                        if (msg.isNotEmpty()) activity.showNoIconToast(msg)
                     }
                     "Favorilerden çıkar" -> {
                         var photoCount = 0
@@ -193,11 +280,11 @@ fun MainActivity.showSelectionMoreMenu() {
                         }
                         
                         exitSelectionMode()
-                        if (msg.isNotEmpty()) showCustomToast(activity, msg, 0)
+                        if (msg.isNotEmpty()) activity.showNoIconToast(msg)
                         if (isShowingFavorites) loadDisplayedList()
                     }
                     "Gizle" -> { 
-                        performHideMedia(selectedMedia.toList()) 
+                        showHideConfirmationDialog(selectedMedia.toList())
                     }
                     "Albüme kopyala" -> {
                         showAlbumSelectionDialog("COPY", selectedMedia.toList())
@@ -510,18 +597,25 @@ fun MainActivity.showInteractiveMapDialog(items: List<MediaItem>) {
 
     val dialog = android.app.Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
     
-    val layout = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(actualBg)
+    val rootLayout = RelativeLayout(activity).apply {
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        setBackgroundColor(actualBg)
     }
     
+    val topBarId = View.generateViewId()
     val topBar = android.widget.RelativeLayout(activity).apply {
+        id = topBarId
         setPadding(40, 40, 40, 40)
         setBackgroundColor(actualBg)
     }
     
     val btnClose = ImageView(activity).apply {
+        layoutParams = android.widget.RelativeLayout.LayoutParams(
+            android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            addRule(android.widget.RelativeLayout.CENTER_VERTICAL)
+        }
         setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
         setColorFilter(iconTint)
         setOnClickListener { dialog.dismiss() }
@@ -543,112 +637,18 @@ fun MainActivity.showInteractiveMapDialog(items: List<MediaItem>) {
     
     topBar.addView(btnClose)
     topBar.addView(topTitle, paramsTitle)
-    layout.addView(topBar)
     
-    var selectedLat: Double? = null
-    var selectedLng: Double? = null
-    
-    val webView = android.webkit.WebView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        webViewClient = android.webkit.WebViewClient()
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.setGeolocationEnabled(true)
-        
-        webChromeClient = object : android.webkit.WebChromeClient() {
-            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: android.webkit.GeolocationPermissions.Callback) {
-                callback.invoke(origin, true, false)
-            }
-        }
-
-        addJavascriptInterface(object {
-            @android.webkit.JavascriptInterface
-            fun onLocationPicked(lat: Double, lng: Double) {
-                selectedLat = lat
-                selectedLng = lng
-            }
-            
-            @android.webkit.JavascriptInterface
-            fun showToast(msg: String) {
-                post { Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show() }
-            }
-        }, "Android")
-        
-        val html = """<!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>
-                html, body { height: 100%; margin: 0; padding: 0; background: #e5e5e5; }
-                #map { height: 100%; width: 100%; } 
-                .locate-btn { background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 50%; width: 44px; height: 44px; font-size: 22px; cursor: pointer; line-height: 44px; text-align: center; text-decoration: none; color: #333; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); margin-top: 15px !important; margin-right: 15px !important; }
-            </style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var map = L.map('map', {zoomControl: false}).setView([39.0, 35.0], 5);
-                L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    maxZoom: 20,
-                    attribution: 'Google'
-                }).addTo(map);
-                
-                L.control.zoom({position: 'bottomright'}).addTo(map);
-                
-                var marker;
-                function updateMarker(lat, lng) {
-                    if(marker) map.removeLayer(marker);
-                    marker = L.marker([lat, lng], {draggable: true}).addTo(map);
-                    marker.on('dragend', function(e) {
-                        var pos = e.target.getLatLng();
-                        Android.onLocationPicked(pos.lat, pos.lng);
-                    });
-                    Android.onLocationPicked(lat, lng);
-                }
-                
-                var LocateControl = L.Control.extend({
-                    options: {position: 'topright'},
-                    onAdd: function(map) {
-                        var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-                        container.style.border = 'none';
-                        container.style.boxShadow = 'none';
-                        var button = L.DomUtil.create('a', 'locate-btn', container);
-                        button.innerHTML = '🎯';
-                        button.href = '#';
-                        button.onclick = function(e) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            Android.showToast("Konum aranıyor, lütfen bekleyin...");
-                            map.locate({setView: true, maxZoom: 16, enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
-                        };
-                        return container;
-                    }
-                });
-                map.addControl(new LocateControl());
-                
-                map.on('locationfound', function(e) {
-                    updateMarker(e.latlng.lat, e.latlng.lng);
-                });
-                map.on('locationerror', function(e) {
-                    Android.showToast("Konum bulunamadı. Cihazın GPS'inin açık olduğundan emin olun.");
-                });
-                map.on('click', function(e) {
-                    updateMarker(e.latlng.lat, e.latlng.lng);
-                });
-            </script>
-        </body>
-        </html>"""
-        loadDataWithBaseURL("https://app.local", html, "text/html", "UTF-8", null)
-    }
-    layout.addView(webView)
-    
+    val bottomBarId = View.generateViewId()
     val bottomBar = LinearLayout(activity).apply {
+        id = bottomBarId
         orientation = LinearLayout.HORIZONTAL
         setBackgroundColor(actualBg)
     }
+    
+    var selectedLat: Double? = null
+    var selectedLng: Double? = null
+    var currentMarker: com.google.android.gms.maps.model.Marker? = null
+    var gMap: com.google.android.gms.maps.GoogleMap? = null
     
     val btnCancel = TextView(activity).apply {
         text = "İptal"
@@ -669,20 +669,78 @@ fun MainActivity.showInteractiveMapDialog(items: List<MediaItem>) {
         setPadding(0, 40, 0, 40)
         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         setOnClickListener {
-            if (selectedLat != null && selectedLng != null) {
+            val target = gMap?.cameraPosition?.target
+            val finalLat = selectedLat ?: target?.latitude
+            val finalLng = selectedLng ?: target?.longitude
+
+            if (finalLat != null && finalLng != null) {
                 dialog.dismiss()
-                updateLocationData(items, selectedLat!!, selectedLng!!)
+                updateLocationData(items, finalLat, finalLng)
             } else {
-                Toast.makeText(activity, "Lütfen haritadan bir konum seçin", Toast.LENGTH_SHORT).show()
+                activity.showNoIconToast("Lütfen haritadan bir konum seçin")
             }
         }
     }
     
     bottomBar.addView(btnCancel)
     bottomBar.addView(btnSave)
-    layout.addView(bottomBar)
+    
+    val mapView = com.google.android.gms.maps.MapView(activity)
+    
+    topBar.layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT).apply {
+        addRule(RelativeLayout.ALIGN_PARENT_TOP)
+    }
+    
+    bottomBar.layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT).apply {
+        addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+    }
+    
+    mapView.layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT).apply {
+        addRule(RelativeLayout.BELOW, topBarId)
+        addRule(RelativeLayout.ABOVE, bottomBarId)
+    }
+    
+    mapView.onCreate(null)
+    mapView.onResume()
+    
+    mapView.getMapAsync { googleMap ->
+        gMap = googleMap
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            googleMap.isMyLocationEnabled = true
+        }
+        
+        val turkey = com.google.android.gms.maps.model.LatLng(39.0, 35.0)
+        googleMap.moveCamera(com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(turkey, 5f))
+        
+        googleMap.setOnMapLongClickListener { latLng ->
+            if (currentMarker == null) {
+                currentMarker = googleMap.addMarker(com.google.android.gms.maps.model.MarkerOptions().position(latLng).draggable(true))
+            } else {
+                currentMarker?.position = latLng
+            }
+            selectedLat = latLng.latitude
+            selectedLng = latLng.longitude
+        }
+        
+        googleMap.setOnMarkerDragListener(object : com.google.android.gms.maps.GoogleMap.OnMarkerDragListener {
+            override fun onMarkerDragStart(marker: com.google.android.gms.maps.model.Marker) {}
+            override fun onMarkerDrag(marker: com.google.android.gms.maps.model.Marker) {}
+            override fun onMarkerDragEnd(marker: com.google.android.gms.maps.model.Marker) {
+                selectedLat = marker.position.latitude
+                selectedLng = marker.position.longitude
+            }
+        })
+    }
+    
+    rootLayout.addView(topBar)
+    rootLayout.addView(mapView)
+    rootLayout.addView(bottomBar)
+    
+    dialog.setOnDismissListener {
+        mapView.onDestroy()
+    }
 
-    dialog.setContentView(layout)
+    dialog.setContentView(rootLayout)
     dialog.show()
 }
 
@@ -837,4 +895,36 @@ fun MainActivity.showMultiDetailsBottomSheet(items: List<MediaItem>) {
     dialog.setContentView(layout)
     dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
     dialog.show()
+}
+
+fun androidx.appcompat.app.AppCompatActivity.showNoIconToast(message: String) {
+    try {
+        val rootView = findViewById<ViewGroup>(android.R.id.content)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#333333"))
+                cornerRadius = 50f
+            }
+            setPadding(40, 24, 40, 24)
+        }
+        val text = TextView(this).apply {
+            this.text = message
+            setTextColor(Color.WHITE)
+            textSize = 15f
+        }
+        layout.addView(text)
+        
+        val params = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = 150
+        }
+        rootView.addView(layout, params)
+        layout.startAnimation(AlphaAnimation(0.0f, 1.0f).apply { duration = 400 })
+        Handler(Looper.getMainLooper()).postDelayed({
+            layout.startAnimation(AlphaAnimation(1.0f, 0.0f).apply { duration = 400 })
+            Handler(Looper.getMainLooper()).postDelayed({ rootView.removeView(layout) }, 400)
+        }, 2000)
+    } catch (e: Exception) {}
 }

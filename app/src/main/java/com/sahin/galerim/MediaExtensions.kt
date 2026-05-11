@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION", "UNUSED_VARIABLE")
+
 package com.sahin.galerim
 
 import android.content.ContentUris
@@ -117,7 +119,6 @@ fun MainActivity.loadAllMedia() {
                     file.delete()
                 }
             } catch (e: Exception) {
-                // Hata yoksayılır
             }
             
             MainActivity.trashedPaths.remove(path)
@@ -207,7 +208,6 @@ fun MainActivity.loadDisplayedList() {
     activity.allRecycler.stopScroll()
     activity.albumsRecycler.stopScroll()
     
-    val oldPos = activity.currentlyPlayingPosition
     activity.currentlyPlayingPosition = -1
     activity.releaseMediaPlayer()
     activity.autoPlayHandler.removeCallbacksAndMessages(null)
@@ -236,7 +236,11 @@ fun MainActivity.loadDisplayedList() {
     } else if (activity.filterBucketId != null) {
         MainActivity.displayedMediaList.addAll(MainActivity.mediaList.filter { it.bucketId == activity.filterBucketId })
     } else if (activity.filterLocation != null) {
-        MainActivity.displayedMediaList.addAll(activity.locationGroups[activity.filterLocation] ?: emptyList())
+        MainActivity.displayedMediaList.addAll(MainActivity.mediaList.filter { item ->
+            val loc = MainActivity.itemLocationCache[item.path] ?: ""
+            val k = if (loc.isEmpty()) "Bilinmeyen Konum" else loc
+            k == activity.filterLocation
+        })
     } else if (activity.bottomTabLayout.selectedTabPosition == 1) {
         MainActivity.displayedMediaList.addAll(MainActivity.mediaList.filter { it.isVideo })
     } else {
@@ -334,7 +338,6 @@ fun MainActivity.loadDisplayedList() {
                         } catch (e: CancellationException) { 
                             throw e 
                         } catch (e: Exception) {
-                            // Hata yoksayılır
                         } finally { 
                             try { 
                                 retriever?.release() 
@@ -469,7 +472,6 @@ fun MainActivity.loadDisplayedList() {
                         } catch (e: CancellationException) { 
                             throw e 
                         } catch (e: Exception) {
-                            // Hata yoksayılır
                         } finally { 
                             try { 
                                 retriever?.release() 

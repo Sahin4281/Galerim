@@ -1,35 +1,65 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/ActionExtensions.kt",
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/MainActivity.kt",
       "selection": {
         "end": {
           "column": 0,
-          "index": 25761,
-          "line": 600
+          "index": 25982,
+          "line": 636
         },
         "start": {
           "column": 0,
-          "index": 25761,
-          "line": 600
+          "index": 25982,
+          "line": 636
         }
       }
     },
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/FullScreenExtensions.kt",
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/res/layout/activity_main.xml",
       "selection": {
         "end": {
           "column": 0,
-          "index": 51464,
-          "line": 1197
+          "index": 27201,
+          "line": 586
         },
         "start": {
           "column": 0,
-          "index": 51464,
-          "line": 1197
+          "index": 27201,
+          "line": 586
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/res/layout/layout_album_side_menu.xml",
+      "selection": {
+        "end": {
+          "column": 0,
+          "index": 1092,
+          "line": 33
+        },
+        "start": {
+          "column": 0,
+          "index": 1092,
+          "line": 33
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/SideMenuExtensions.kt",
+      "selection": {
+        "end": {
+          "column": 0,
+          "index": 7879,
+          "line": 196
+        },
+        "start": {
+          "column": 0,
+          "index": 7879,
+          "line": 196
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/FullScreenExtensions.kt"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/galerim/app/src/main/java/com/sahin/galerim/SideMenuExtensions.kt"
 }

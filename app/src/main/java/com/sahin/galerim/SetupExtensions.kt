@@ -235,11 +235,11 @@ fun MainActivity.setupElegantBottomTabs() {
             text = tabNames[i]
             textSize = 14.5f
             gravity = android.view.Gravity.CENTER
-            setTextColor(if (i == 0) primaryColor else Color.parseColor("#888888"))
-            setTypeface(null, if (i == 0) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
         }
         bottomTabLayout.addTab(tab)
     }
+    
+    updateTabAppearance(0)
     
     bottomTabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
         override fun onTabSelected(tab: TabLayout.Tab) {

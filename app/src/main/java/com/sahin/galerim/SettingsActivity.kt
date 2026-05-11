@@ -80,7 +80,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             
             val title = TextView(this).apply {
-                text = "Galerim Hakkında"
+                text = "Galerim"
                 setTextColor(primaryTextColor)
                 textSize = 20f
                 setTypeface(null, android.graphics.Typeface.BOLD)
@@ -185,7 +185,10 @@ class SettingsActivity : AppCompatActivity() {
                 setOnClickListener {
                     dialog.dismiss()
                     if (theme != currentTheme) {
-                        prefs.edit().putString("appTheme", theme).apply()
+                        prefs.edit()
+                            .putString("appTheme", theme)
+                            .putString("bg_type", "default")
+                            .apply()
                         tvCurrentTheme?.text = theme
                         recreate() 
                     }
