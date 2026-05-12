@@ -37,10 +37,11 @@ fun MainActivity.performTrashRestore(items: List<MediaItem>) {
                     val destFile = File(origPath)
                     destFile.parentFile?.mkdirs()
                     
+                    val originalLastModified = trashFile.lastModified()
                     trashFile.copyTo(destFile, overwrite = true)
                     
                     if (destFile.exists()) {
-                        destFile.setLastModified(trashFile.lastModified())
+                        destFile.setLastModified(originalLastModified)
                         android.media.MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), null, null)
                         
                         trashFile.delete()
@@ -101,10 +102,11 @@ fun MainActivity.performMultiDelete(items: List<MediaItem>, useTrash: Boolean) {
                 if (sourceFile.exists()) {
                     val destFile = File(trashFolder, "${System.currentTimeMillis()}_${sourceFile.name}")
                     
+                    val originalLastModified = sourceFile.lastModified()
                     sourceFile.copyTo(destFile, overwrite = true)
                     
                     if (destFile.exists()) {
-                        destFile.setLastModified(sourceFile.lastModified())
+                        destFile.setLastModified(originalLastModified)
                         
                         MainActivity.trashedPaths.add(destFile.absolutePath)
                         MainActivity.trashedOriginalPaths[destFile.absolutePath] = sourceFile.absolutePath
@@ -193,7 +195,10 @@ fun MainActivity.processCopyMove(action: String, items: List<MediaItem>, destFol
                 val dest = File(destFolder, source.name)
                 
                 if (source.exists() && source.absolutePath != dest.absolutePath) {
+                    val originalLastModified = source.lastModified()
                     source.copyTo(dest, overwrite = true)
+                    dest.setLastModified(originalLastModified)
+                    
                     android.media.MediaScannerConnection.scanFile(this@processCopyMove, arrayOf(dest.absolutePath), null, null)
                     
                     if (action == "MOVE") {
@@ -644,7 +649,8 @@ fun MainActivity.performHideMedia(items: List<MediaItem>) {
             try {
                 val sourceFile = File(item.path)
                 if (sourceFile.exists()) {
-                    val originalDate = item.dateAdded * 1000L
+                    val originalDate = sourceFile.lastModified()
+                    val originalDateSec = item.dateAdded * 1000L
                     val destFile = File(hiddenFolder, "${System.currentTimeMillis()}_${sourceFile.name}")
                     
                     sourceFile.copyTo(destFile, overwrite = true)
@@ -657,7 +663,7 @@ fun MainActivity.performHideMedia(items: List<MediaItem>) {
                             hiddenPath = destFile.absolutePath,
                             isVideo = item.isVideo,
                             dateAdded = System.currentTimeMillis(),
-                            originalDate = originalDate
+                            originalDate = originalDateSec
                         )
                         db.hiddenMediaDao().insert(hiddenEntry)
 
@@ -876,5 +882,41 @@ fun modifyVideoLocationWithMuxer(sourceFile: File, tempFile: File, lat: Double?,
     } catch (e: Exception) {
         e.printStackTrace()
         return false
+    }
+}
+
+fun MainActivity.renameMediaFile(item: MediaItem, newNameWithExt: String) {
+    showNoIconToast("Yeniden isimlendiriliyor...")
+    lifecycleScope.launch(Dispatchers.IO) {
+        try {
+            val sourceFile = File(item.path)
+            val destFile = File(sourceFile.parentFile, newNameWithExt)
+            
+            if (sourceFile.exists() && !destFile.exists()) {
+                if (sourceFile.renameTo(destFile)) {
+                    android.media.MediaScannerConnection.scanFile(this@renameMediaFile, arrayOf(destFile.absolutePath), null, null)
+                    contentResolver.delete(item.uri, null, null)
+                    
+                    withContext(Dispatchers.Main) {
+                        showNoIconToast("Yeniden isimlendirildi")
+                        exitSelectionMode()
+                        MainActivity.forceReload = true
+                        loadAllMedia()
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        showNoIconToast("İsim değiştirilemedi")
+                    }
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    showNoIconToast("Bu isimde bir dosya zaten var")
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                showNoIconToast("Bir hata oluştu")
+            }
+        }
     }
 }

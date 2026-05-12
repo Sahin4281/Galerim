@@ -313,6 +313,9 @@ fun FullScreenActivity.moveToAppTrash() {
             if (sourceFile.exists()) {
                 val destFile = File(trashFolder, "${System.currentTimeMillis()}_${sourceFile.name}")
                 
+                // DOSYA TAŞINMADAN ÖNCE ORİJİNAL TARİHİ ALIYORUZ
+                val originalLastModified = sourceFile.lastModified()
+                
                 val moved = sourceFile.renameTo(destFile)
                 if (!moved) {
                     FileInputStream(sourceFile).use { input ->
@@ -324,7 +327,8 @@ fun FullScreenActivity.moveToAppTrash() {
                 }
                 
                 if (destFile.exists()) {
-                    destFile.setLastModified(sourceFile.lastModified())
+                    // YENİ DOSYAYA KAYDETTİĞİMİZ DOĞRU TARİHİ İŞLİYORUZ
+                    destFile.setLastModified(originalLastModified)
                     
                     MainActivity.trashedPaths.add(destFile.absolutePath)
                     MainActivity.trashedOriginalPaths[destFile.absolutePath] = sourceFile.absolutePath
@@ -508,6 +512,7 @@ fun FullScreenActivity.performHideMedia() {
 fun FullScreenActivity.showAlbumSelectionDialog(action: String, itemsToProcess: List<MediaItem>) {
     val dialogBgColor = ContextCompat.getColor(this, R.color.p_app_dialog_bg)
     val primaryColor = ContextCompat.getColor(this, R.color.p_app_text_primary)
+    val iconTint = ContextCompat.getColor(this, R.color.p_app_icon_tint)
     val dialog = BottomSheetDialog(this)
     val layout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -524,9 +529,38 @@ fun FullScreenActivity.showAlbumSelectionDialog(action: String, itemsToProcess: 
         setTextColor(primaryColor)
         textSize = 18f
         setTypeface(null, android.graphics.Typeface.BOLD)
-        setPadding(24, 0, 0, 40)
+        setPadding(24, 0, 0, 20)
     }
     layout.addView(title)
+
+    val btnCreateAlbum = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(24, 32, 24, 32)
+        val typedValue = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+        setBackgroundResource(typedValue.resourceId)
+        isClickable = true
+        isFocusable = true
+        setOnClickListener {
+            dialog.dismiss()
+            showCreateAlbumDialog(action, itemsToProcess)
+        }
+    }
+
+    btnCreateAlbum.addView(ImageView(this).apply {
+        setImageResource(android.R.drawable.ic_input_add)
+        setColorFilter(iconTint)
+        layoutParams = LinearLayout.LayoutParams(64, 64).apply { setMargins(0, 0, 32, 0) }
+    })
+
+    btnCreateAlbum.addView(TextView(this).apply {
+        text = "Yeni Albüm Oluştur"
+        setTextColor(primaryColor)
+        textSize = 16f
+    })
+
+    layout.addView(btnCreateAlbum)
     
     val uniqueAlbums = mutableListOf<Album>()
     val sdCardPattern = Regex("^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$")
@@ -559,6 +593,68 @@ fun FullScreenActivity.showAlbumSelectionDialog(action: String, itemsToProcess: 
     dialog.show()
 }
 
+fun FullScreenActivity.showCreateAlbumDialog(action: String, itemsToProcess: List<MediaItem>) {
+    val dialog = BottomSheetDialog(this)
+    val dialogBgColor = ContextCompat.getColor(this, R.color.p_app_dialog_bg)
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(48, 48, 48, 48)
+        background = GradientDrawable().apply {
+            setColor(if (isAmoledTheme) Color.BLACK else dialogBgColor)
+            cornerRadii = floatArrayOf(60f, 60f, 60f, 60f, 0f, 0f, 0f, 0f)
+        }
+    }
+
+    val title = TextView(this).apply {
+        text = "Yeni Albüm Oluştur"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 32)
+    }
+    layout.addView(title)
+
+    val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val accentColorStr = prefs.getString("accentColor", "#5C94FF") ?: "#5C94FF"
+    val accentColor = Color.parseColor(accentColorStr)
+
+    val input = android.widget.EditText(this).apply {
+        hint = "Albüm Adı"
+        setHintTextColor(Color.parseColor("#888888"))
+        setTextColor(ContextCompat.getColor(this@showCreateAlbumDialog, R.color.p_app_text_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+    layout.addView(input)
+
+    val btnSave = AppCompatButton(this).apply {
+        text = "Oluştur ve ${if (action == "COPY") "Kopyala" else "Taşı"}"
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(accentColor)
+            cornerRadius = 30f
+        }
+        setTextColor(Color.WHITE)
+        setOnClickListener {
+            val newName = input.text.toString().trim()
+            if (newName.isNotEmpty()) {
+                val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                val newAlbumFolder = File(picturesDir, newName)
+                if (!newAlbumFolder.exists()) {
+                    newAlbumFolder.mkdirs()
+                }
+                dialog.dismiss()
+                processCopyMove(action, itemsToProcess, newAlbumFolder)
+            }
+        }
+    }
+    layout.addView(btnSave)
+
+    dialog.setContentView(layout)
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    dialog.show()
+}
+
 fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, destFolder: File) {
     showFsCustomToast("İşlem başlatıldı...", 0)
     lifecycleScope.launch(Dispatchers.IO) {
@@ -569,20 +665,14 @@ fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, d
                 val source = File(item.path)
                 val dest = File(destFolder, source.name)
                 if (source.exists() && source.absolutePath != dest.absolutePath) {
-                    val moved = source.renameTo(dest)
-                    if (!moved) {
-                        source.copyTo(dest, overwrite = true)
-                    }
-                    
-                    dest.setLastModified(source.lastModified())
+                    val originalLastModified = source.lastModified()
+                    source.copyTo(dest, overwrite = true)
+                    dest.setLastModified(originalLastModified)
                     
                     android.media.MediaScannerConnection.scanFile(this@processCopyMove, arrayOf(dest.absolutePath), null, null)
                     
                     if (action == "MOVE") {
-                        if (moved) {
-                        } else {
-                            source.delete()
-                        }
+                        source.delete()
                         contentResolver.delete(item.uri, null, null)
                     }
                     if (item.isVideo) vCount++ else pCount++
@@ -590,22 +680,64 @@ fun FullScreenActivity.processCopyMove(action: String, items: List<MediaItem>, d
             } catch (e: Exception) {}
         }
         withContext(Dispatchers.Main) {
-            val actionText = if(action=="COPY") "kopyalandı" else "taşındı"
+            val actionText = if (action == "COPY") "kopyalandı" else "taşındı"
             val msg = when {
                 pCount > 0 && vCount > 0 -> "$pCount fotoğraf ve $vCount video $actionText"
                 pCount > 0 -> "$pCount fotoğraf $actionText"
                 vCount > 0 -> "$vCount video $actionText"
                 else -> ""
             }
-            showFsCustomToast(msg, 0)
+            if (msg.isNotEmpty()) showFsCustomToast(msg, 0)
             if (action == "MOVE") {
                 MainActivity.forceReload = true
-                finish()
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (!isFinishing) finish()
+                }, 1500)
             }
         }
     }
 }
 
+fun FullScreenActivity.renameMediaFileFs(item: MediaItem, newNameWithExt: String) {
+    showFsCustomToast("Yeniden isimlendiriliyor...", 0)
+    lifecycleScope.launch(Dispatchers.IO) {
+        try {
+            val sourceFile = File(item.path)
+            val destFile = File(sourceFile.parentFile, newNameWithExt)
+            
+            if (sourceFile.exists() && !destFile.exists()) {
+                if (sourceFile.renameTo(destFile)) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DATA, destFile.absolutePath)
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, newNameWithExt)
+                    }
+                    contentResolver.update(item.uri, values, null, null)
+                    android.media.MediaScannerConnection.scanFile(this@renameMediaFileFs, arrayOf(destFile.absolutePath), null, null)
+                    
+                    withContext(Dispatchers.Main) {
+                        showFsCustomToast("Yeniden isimlendirildi", 0)
+                        MainActivity.forceReload = true
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (!isFinishing) finish()
+                        }, 1500)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        showFsCustomToast("İsim değiştirilemedi", 0)
+                    }
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    showFsCustomToast("Bu isimde bir dosya zaten var", 0)
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                showFsCustomToast("Bir hata oluştu", 0)
+            }
+        }
+    }
+}
 
 fun FullScreenActivity.showMoreMenu(view: View) {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
@@ -629,7 +761,7 @@ fun FullScreenActivity.showMoreMenu(view: View) {
     val isFavorite = MainActivity.favoritePaths.contains(item.path)
     val favOption = if (isFavorite) "Favorilerden çıkar" else "Favorilere ekle"
     
-    val options = mutableListOf("Ayrıntılar", "Gizle", favOption, "Albüme kopyala", "Albüme taşı", "Tarih ve saati düzenle", "Konumu düzenle")
+    val options = mutableListOf("Ayrıntılar", "Yeniden isimlendir", "Gizle", favOption, "Albüme kopyala", "Albüme taşı", "Tarih ve saati düzenle", "Konumu düzenle")
     
     if (item.isVideo) { 
         options.add("Video oynatıcıda aç") 
@@ -645,6 +777,19 @@ fun FullScreenActivity.showMoreMenu(view: View) {
                 popup.dismiss()
                 when(opt) {
                     "Ayrıntılar" -> { showModernDetailsBottomSheet() }
+                    "Yeniden isimlendir" -> { 
+                        val dialogActivity = this@showMoreMenu
+                        try {
+                            val dialogClass = Class.forName("com.sahin.galerim.DialogExtensionsKt")
+                            val method = dialogClass.getMethod("showRenameMediaDialogFs", FullScreenActivity::class.java, MediaItem::class.java)
+                            method.invoke(null, dialogActivity, item)
+                        } catch (e: Exception) {
+                            try {
+                                val method2 = dialogActivity.javaClass.getMethod("showRenameMediaDialogFs", MediaItem::class.java)
+                                method2.invoke(dialogActivity, item)
+                            } catch (e2: Exception) {}
+                        }
+                    }
                     "Gizle" -> { showHideConfirmationDialog(listOf(item)) }
                     "Favorilere ekle", "Favorilerden çıkar" -> { toggleFavorite() }
                     "Albüme kopyala" -> { showAlbumSelectionDialog("COPY", listOf(item)) }

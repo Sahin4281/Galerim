@@ -187,6 +187,10 @@ class MainActivity : AppCompatActivity() {
     lateinit var selectionTopBar: View
     lateinit var selectionBottomBar: View
     lateinit var tvSelectionCount: TextView
+
+    var isAlbumSelectionMode = false
+    val selectedAlbums = mutableSetOf<Album>()
+    lateinit var albumSelectionBottomBar: View
     
     lateinit var trashTopBar: View
     lateinit var emptyTrashView: View
@@ -342,6 +346,7 @@ class MainActivity : AppCompatActivity() {
         albumsRecycler = findViewById(R.id.albumsRecycler)
         selectionTopBar = findViewById(R.id.selectionTopBar)
         selectionBottomBar = findViewById(R.id.selectionBottomBar)
+        albumSelectionBottomBar = findViewById(R.id.albumSelectionBottomBar)
         tvSelectionCount = findViewById(R.id.tvSelectionCount)
         
         trashTopBar = findViewById(R.id.trashTopBar)
@@ -391,12 +396,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.btnTrashMore)?.setOnClickListener { showTrashMoreMenu(it) }
+
+        findViewById<View>(R.id.btnCloseSelection)?.setOnClickListener {
+            if (isSelectionMode) exitSelectionMode()
+            if (isAlbumSelectionMode) exitAlbumSelectionMode()
+        }
+
+        findViewById<View>(R.id.btnAlbumDelete)?.setOnClickListener {
+            if (selectedAlbums.isNotEmpty()) {
+                showAlbumDeleteConfirmationDialog(selectedAlbums.toList())
+            }
+        }
+
+        findViewById<View>(R.id.btnAlbumRename)?.setOnClickListener {
+            if (selectedAlbums.size == 1) {
+                val album = selectedAlbums.first()
+                val preferences = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+                val currentName = preferences.getString("custom_name_${album.bucketId ?: album.locationName}", null) ?: album.name
+                showRenameAlbumDialog(album.bucketId, album.locationName, currentName)
+            }
+        }
         
         setupElegantBottomTabs()
         
         bottomTabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
-                enableSideMenu(false)
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
             override fun onTabReselected(tab: TabLayout.Tab?) {}
@@ -405,7 +429,6 @@ class MainActivity : AppCompatActivity() {
         setupSelectionButtons()
         setupFastScroller()
         setupSearchFunctionality()
-        setupSideMenu()
         
         val itemAnimator = allRecycler.itemAnimator
         if (itemAnimator is androidx.recyclerview.widget.SimpleItemAnimator) {
@@ -452,6 +475,8 @@ class MainActivity : AppCompatActivity() {
                     closeSearchMode()
                 } else if (isSelectionMode) {
                     exitSelectionMode()
+                } else if (isAlbumSelectionMode) {
+                    exitAlbumSelectionMode()
                 } else if (filterBucketId != null || filterLocation != null) { 
                     filterBucketId = null
                     filterLocation = null
@@ -464,8 +489,6 @@ class MainActivity : AppCompatActivity() {
                     findViewById<View>(R.id.albumStickyHeader)?.visibility = View.GONE
                     mainTitle.visibility = View.GONE
                     topIconsContainer.visibility = View.GONE
-                    
-                    enableSideMenu(false)
                     
                 } else if (isShowingTrash || isShowingFavorites || isShowingPlaces || isShowingLocations) { 
                     resetStates()
@@ -481,6 +504,35 @@ class MainActivity : AppCompatActivity() {
         })
         
         checkAndRequestPermission()
+    }
+
+    fun updateAlbumSelectionUI() {
+        if (isAlbumSelectionMode) {
+            selectionTopBar.visibility = View.VISIBLE
+            albumSelectionBottomBar.visibility = View.VISIBLE
+            bottomTabLayout.visibility = View.GONE
+            tvSelectionCount.text = "${selectedAlbums.size} seçili"
+            
+            val btnRename = findViewById<View>(R.id.btnAlbumRename)
+            if (selectedAlbums.size == 1) {
+                btnRename?.alpha = 1f
+                btnRename?.isEnabled = true
+            } else {
+                btnRename?.alpha = 0.5f
+                btnRename?.isEnabled = false
+            }
+        } else {
+            selectionTopBar.visibility = View.GONE
+            albumSelectionBottomBar.visibility = View.GONE
+            bottomTabLayout.visibility = View.VISIBLE
+        }
+    }
+
+    fun exitAlbumSelectionMode() {
+        isAlbumSelectionMode = false
+        selectedAlbums.clear()
+        updateAlbumSelectionUI()
+        albumsRecycler.adapter?.notifyDataSetChanged()
     }
     
     fun closeSearchMode() {

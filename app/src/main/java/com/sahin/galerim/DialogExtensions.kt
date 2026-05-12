@@ -26,6 +26,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.regex.Pattern
+import android.content.Context
+import android.content.Intent
 
 class DialogAlbumAdapter(
     private val albums: List<Album>,
@@ -66,6 +68,7 @@ fun MainActivity.showAlbumSelectionDialog(action: String, itemsToProcess: List<M
     val activity = this
     val primaryColor = ContextCompat.getColor(activity, R.color.p_app_text_primary)
     val menuBgColor = getMenuBgColor()
+    val iconTint = ContextCompat.getColor(activity, R.color.p_app_icon_tint)
     
     val dialog = BottomSheetDialog(activity)
     val layout = LinearLayout(activity).apply {
@@ -83,9 +86,38 @@ fun MainActivity.showAlbumSelectionDialog(action: String, itemsToProcess: List<M
         setTextColor(primaryColor)
         textSize = 18f
         setTypeface(null, android.graphics.Typeface.BOLD)
-        setPadding(24, 0, 0, 40)
+        setPadding(24, 0, 0, 20)
     }
     layout.addView(title)
+
+    val btnCreateAlbum = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(24, 32, 24, 32)
+        val typedValue = android.util.TypedValue()
+        context.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+        setBackgroundResource(typedValue.resourceId)
+        isClickable = true
+        isFocusable = true
+        setOnClickListener {
+            dialog.dismiss()
+            showCreateAlbumDialog(action, itemsToProcess)
+        }
+    }
+
+    btnCreateAlbum.addView(ImageView(activity).apply {
+        setImageResource(android.R.drawable.ic_input_add)
+        setColorFilter(iconTint)
+        layoutParams = LinearLayout.LayoutParams(64, 64).apply { setMargins(0, 0, 32, 0) }
+    })
+
+    btnCreateAlbum.addView(TextView(activity).apply {
+        text = "Yeni Albüm Oluştur"
+        setTextColor(primaryColor)
+        textSize = 16f
+    })
+
+    layout.addView(btnCreateAlbum)
     
     val uniqueAlbums = mutableListOf<Album>()
     val sdCardPattern = Regex("^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$")
@@ -114,6 +146,265 @@ fun MainActivity.showAlbumSelectionDialog(action: String, itemsToProcess: List<M
     
     layout.addView(recyclerView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     
+    dialog.setContentView(layout)
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    dialog.show()
+}
+
+fun MainActivity.showCreateAlbumDialog(action: String, itemsToProcess: List<MediaItem>) {
+    val dialog = BottomSheetDialog(this)
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(48, 48, 48, 48)
+        background = GradientDrawable().apply {
+            setColor(getMenuBgColor())
+            cornerRadii = floatArrayOf(60f, 60f, 60f, 60f, 0f, 0f, 0f, 0f)
+        }
+    }
+
+    val title = TextView(this).apply {
+        text = "Yeni Albüm Oluştur"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 32)
+    }
+    layout.addView(title)
+
+    val input = android.widget.EditText(this).apply {
+        hint = "Albüm Adı"
+        setHintTextColor(Color.parseColor("#888888"))
+        setTextColor(ContextCompat.getColor(this@showCreateAlbumDialog, R.color.p_app_text_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(getAccentColor())
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+    layout.addView(input)
+
+    val btnSave = AppCompatButton(this).apply {
+        text = "Oluştur ve ${if (action == "COPY") "Kopyala" else "Taşı"}"
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(getAccentColor())
+            cornerRadius = 30f
+        }
+        setTextColor(Color.WHITE)
+        setOnClickListener {
+            val newName = input.text.toString().trim()
+            if (newName.isNotEmpty()) {
+                val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                val newAlbumFolder = File(picturesDir, newName)
+                if (!newAlbumFolder.exists()) {
+                    newAlbumFolder.mkdirs()
+                }
+                dialog.dismiss()
+                processCopyMove(action, itemsToProcess, newAlbumFolder)
+            }
+        }
+    }
+    layout.addView(btnSave)
+
+    dialog.setContentView(layout)
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    dialog.show()
+}
+
+fun MainActivity.showAlbumDeleteConfirmationDialog(albums: List<Album>) {
+    val activity = this
+    val primaryColor = ContextCompat.getColor(activity, R.color.p_app_text_primary)
+    val menuBgColor = getMenuBgColor()
+    
+    val dialog = BottomSheetDialog(activity)
+    val view = activity.layoutInflater.inflate(R.layout.dialog_trash_confirmation, null)
+    dialog.setContentView(view)
+    
+    view.background = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = 60f
+        setColor(menuBgColor)
+    }
+    
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    
+    val messageView = view.findViewById<TextView>(R.id.dialogMessage)
+    messageView.gravity = Gravity.CENTER
+    messageView.setTextColor(primaryColor)
+
+    val albumCount = albums.size
+    messageView.text = "$albumCount seçili albüm içindeki tüm dosyalar Çöp Kutusuna taşınsın mı?"
+    
+    val btnConfirm = view.findViewById<AppCompatButton>(R.id.btnConfirm)
+    val parentLayout = btnConfirm.parent as? ViewGroup
+    
+    if (parentLayout is LinearLayout) {
+        parentLayout.removeAllViews()
+        parentLayout.gravity = Gravity.CENTER
+        
+        val dp10 = (10 * activity.resources.displayMetrics.density).toInt()
+        val btnWidth = (110 * activity.resources.displayMetrics.density).toInt() 
+        val btnHeight = (42 * activity.resources.displayMetrics.density).toInt()
+        
+        val btnCancelNew = AppCompatButton(activity).apply {
+            text = "İptal"
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#4CAF50")) 
+                cornerRadius = 30f
+            }
+            layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginEnd = dp10 }
+            setOnClickListener { dialog.dismiss() }
+        }
+        
+        val btnConfirmNew = AppCompatButton(activity).apply {
+            text = "Sil"
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            textSize = 15f
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#FF5252")) 
+                cornerRadius = 30f
+            }
+            layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginStart = dp10 }
+            setOnClickListener {
+                dialog.dismiss()
+                val itemsToDelete = mutableListOf<MediaItem>()
+                albums.forEach { album ->
+                    if (album.locationName != null) {
+                        itemsToDelete.addAll(MainActivity.mediaList.filter { File(it.path).parentFile?.absolutePath == album.locationName })
+                    } else if (album.bucketId != null) {
+                        itemsToDelete.addAll(MainActivity.mediaList.filter { it.bucketId == album.bucketId })
+                    }
+                }
+                if (itemsToDelete.isNotEmpty()) {
+                    performMultiDelete(itemsToDelete, true)
+                }
+                exitAlbumSelectionMode()
+            }
+        }
+        
+        parentLayout.addView(btnCancelNew)
+        parentLayout.addView(btnConfirmNew)
+    }
+
+    dialog.show()
+}
+
+fun MainActivity.showRenameMediaDialog(item: MediaItem) {
+    val dialog = BottomSheetDialog(this)
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(48, 48, 48, 48)
+        background = GradientDrawable().apply {
+            setColor(getMenuBgColor())
+            cornerRadii = floatArrayOf(60f, 60f, 60f, 60f, 0f, 0f, 0f, 0f)
+        }
+    }
+
+    val title = TextView(this).apply {
+        text = "Yeniden İsimlendir"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 32)
+    }
+    layout.addView(title)
+
+    val currentFile = File(item.path)
+    val extension = currentFile.extension
+    val nameWithoutExtension = currentFile.nameWithoutExtension
+
+    val input = android.widget.EditText(this).apply {
+        setText(nameWithoutExtension)
+        setTextColor(ContextCompat.getColor(this@showRenameMediaDialog, R.color.p_app_text_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(getAccentColor())
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+    layout.addView(input)
+
+    val btnSave = AppCompatButton(this).apply {
+        text = "Kaydet"
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(getAccentColor())
+            cornerRadius = 30f
+        }
+        setTextColor(Color.WHITE)
+        setOnClickListener {
+            val newName = input.text.toString().trim()
+            if (newName.isNotEmpty() && newName != nameWithoutExtension) {
+                dialog.dismiss()
+                renameMediaFile(item, "$newName.$extension")
+            }
+        }
+    }
+    layout.addView(btnSave)
+
+    dialog.setContentView(layout)
+    dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+    dialog.show()
+}
+
+fun FullScreenActivity.showRenameMediaDialogFs(item: MediaItem) {
+    val dialog = BottomSheetDialog(this)
+    val layout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(48, 48, 48, 48)
+        
+        val themePrefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+        val currentTheme = themePrefs.getString("appTheme", "Sistem Teması")
+        val isAmoled = currentTheme == "Koyu Amoled Tema"
+        val menuBgColor = if (isAmoled) Color.parseColor("#121212") else ContextCompat.getColor(this@showRenameMediaDialogFs, R.color.p_app_dialog_bg)
+        
+        background = GradientDrawable().apply {
+            setColor(menuBgColor)
+            cornerRadii = floatArrayOf(60f, 60f, 60f, 60f, 0f, 0f, 0f, 0f)
+        }
+    }
+
+    val title = TextView(this).apply {
+        text = "Yeniden İsimlendir"
+        setTextColor(Color.parseColor("#888888"))
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(0, 0, 0, 32)
+    }
+    layout.addView(title)
+
+    val currentFile = File(item.path)
+    val extension = currentFile.extension
+    val nameWithoutExtension = currentFile.nameWithoutExtension
+
+    val prefs = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val accentColorStr = prefs.getString("accentColor", "#5C94FF") ?: "#5C94FF"
+    val accentColor = Color.parseColor(accentColorStr)
+
+    val input = android.widget.EditText(this).apply {
+        setText(nameWithoutExtension)
+        setTextColor(ContextCompat.getColor(this@showRenameMediaDialogFs, R.color.p_app_text_primary))
+        backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+    layout.addView(input)
+
+    val btnSave = AppCompatButton(this).apply {
+        text = "Kaydet"
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = 32 }
+        background = GradientDrawable().apply {
+            setColor(accentColor)
+            cornerRadius = 30f
+        }
+        setTextColor(Color.WHITE)
+        setOnClickListener {
+            val newName = input.text.toString().trim()
+            if (newName.isNotEmpty() && newName != nameWithoutExtension) {
+                dialog.dismiss()
+                renameMediaFileFs(item, "$newName.$extension")
+            }
+        }
+    }
+    layout.addView(btnSave)
+
     dialog.setContentView(layout)
     dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
     dialog.show()
@@ -225,7 +516,11 @@ fun MainActivity.showSelectionMoreMenu() {
     val allAreFavorites = selectedMedia.all { MainActivity.favoritePaths.contains(it.path) }
     val favoriteAction = if (allAreFavorites) "Favorilerden çıkar" else "Favorilere ekle"
     
-    val options = listOf("Ayrıntılar", favoriteAction, "Gizle", "Albüme kopyala", "Albüme taşı", "Tarih ve saati düzenle", "Konumu düzenle")
+    val options = mutableListOf("Ayrıntılar", favoriteAction, "Gizle", "Albüme kopyala", "Albüme taşı", "Tarih ve saati düzenle", "Konumu düzenle")
+    
+    if (selectedMedia.size == 1) {
+        options.add(1, "Yeniden isimlendir")
+    }
     
     for (opt in options) {
         menuLayout.addView(TextView(activity).apply {
@@ -242,6 +537,11 @@ fun MainActivity.showSelectionMoreMenu() {
                             showSingleItemDetailsBottomSheet(selectedMedia.first())
                         } else {
                             showMultiDetailsBottomSheet(selectedMedia.toList())
+                        }
+                    }
+                    "Yeniden isimlendir" -> {
+                        if (selectedMedia.size == 1) {
+                            showRenameMediaDialog(selectedMedia.first())
                         }
                     }
                     "Favorilere ekle" -> {

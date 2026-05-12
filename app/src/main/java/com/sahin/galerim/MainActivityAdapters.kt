@@ -184,7 +184,7 @@ class AllMediaAdapter(private val activity: MainActivity) : RecyclerView.Adapter
                 
                 if (!activity.isShowingTrash && !activity.isSelectionMode && pos == activity.currentlyPlayingPosition && activity.isActivityResumed) {
                     holder.texture.visibility = View.VISIBLE
-                    
+                        
                     val isAlreadyPlaying = activity.mediaPlayer != null && activity.currentlyPlayingMediaPath == m.path
                     
                     if (!isAlreadyPlaying) {
@@ -443,7 +443,9 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
     
     inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) { 
         val thumb: ImageView = v.findViewById(R.id.thumbnail)
-        val name: TextView = v.findViewById(R.id.albumName) 
+        val name: TextView = v.findViewById(R.id.albumName)
+        val selectionOverlay: View? = v.findViewById(R.id.selectionOverlay)
+        val selectionCheck: ImageView? = v.findViewById(R.id.selectionCheck)
     }
     
     override fun onCreateViewHolder(p: ViewGroup, t: Int) = ViewHolder(
@@ -474,7 +476,51 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
         h.name.text = "$displayName\n${a.count}"
         h.name.setTextColor(adaptiveTextColor) 
         
+        if (activity.isAlbumSelectionMode) {
+            h.selectionOverlay?.visibility = View.VISIBLE
+            h.selectionCheck?.visibility = View.VISIBLE
+            if (activity.selectedAlbums.contains(a)) {
+                h.selectionOverlay?.setBackgroundColor(Color.parseColor("#88000000"))
+                h.selectionCheck?.setImageDrawable(CheckCircleDrawable(activity.getAccentColor()))
+                h.selectionCheck?.imageTintList = null
+            } else {
+                h.selectionOverlay?.setBackgroundColor(Color.TRANSPARENT)
+                h.selectionCheck?.setImageResource(R.drawable.ic_check_circle_off)
+                h.selectionCheck?.imageTintList = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(activity, R.color.p_app_icon_tint))
+            }
+        } else {
+            h.selectionOverlay?.visibility = View.GONE
+            h.selectionCheck?.visibility = View.GONE
+        }
+
+        h.itemView.setOnLongClickListener {
+            if (!activity.isAlbumSelectionMode) {
+                activity.isAlbumSelectionMode = true
+                activity.selectedAlbums.add(a)
+                activity.updateAlbumSelectionUI()
+                notifyDataSetChanged()
+            }
+            true
+        }
+
         h.itemView.setOnClickListener { 
+            if (activity.isAlbumSelectionMode) {
+                if (activity.selectedAlbums.contains(a)) {
+                    activity.selectedAlbums.remove(a)
+                    if (activity.selectedAlbums.isEmpty()) {
+                        activity.exitAlbumSelectionMode()
+                    } else {
+                        activity.updateAlbumSelectionUI()
+                        notifyItemChanged(pos)
+                    }
+                } else {
+                    activity.selectedAlbums.add(a)
+                    activity.updateAlbumSelectionUI()
+                    notifyItemChanged(pos)
+                }
+                return@setOnClickListener
+            }
+
             try {
                 activity.currentlyPlayingPosition = -1
                 activity.releaseMediaPlayer()
@@ -484,8 +530,6 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
             } catch (e: Exception) {}
 
             try {
-                activity.enableSideMenu(true)
-
                 if (a.locationName != null) {
                     activity.filterLocation = a.locationName
                     activity.loadDisplayedList()
