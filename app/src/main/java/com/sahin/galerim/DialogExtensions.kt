@@ -714,6 +714,12 @@ fun MainActivity.showDateEditDialog(items: List<MediaItem>) {
         setTypeface(null, android.graphics.Typeface.BOLD)
         setPadding(32, 24, 32, 24)
         setOnClickListener {
+            npDay.clearFocus()
+            npMonth.clearFocus()
+            npYear.clearFocus()
+            npHour.clearFocus()
+            npMin.clearFocus()
+            
             dialog.dismiss()
             cal.set(npYear.value, npMonth.value, npDay.value, npHour.value, npMin.value)
             saveNewDateToItems(items, cal)

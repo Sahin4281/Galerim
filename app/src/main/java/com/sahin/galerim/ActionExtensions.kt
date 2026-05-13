@@ -20,6 +20,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import java.nio.ByteBuffer
+import android.os.Build
 
 fun MainActivity.performTrashRestore(items: List<MediaItem>) {
     if (items.isEmpty()) return
@@ -240,9 +241,12 @@ fun MainActivity.saveNewDateToItems(items: List<MediaItem>, cal: Calendar) {
         val dateStr = format.format(cal.time)
         val timeInMillis = cal.timeInMillis
         val timeInSeconds = timeInMillis / 1000L
-        val pathsToScan = mutableListOf<String>()
+        
+        val prefs = getSharedPreferences("GalleryPrefs", android.content.Context.MODE_PRIVATE)
+        val editedSet = prefs.getStringSet("manually_edited_media", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
 
         for (item in items) {
+            editedSet.add(item.path)
             item.dateAdded = timeInSeconds 
             
             try {
@@ -269,22 +273,34 @@ fun MainActivity.saveNewDateToItems(items: List<MediaItem>, cal: Calendar) {
                     if (!item.isVideo) {
                         put(MediaStore.Images.Media.DATE_TAKEN, timeInMillis)
                     } else {
-                        put(MediaStore.Video.Media.DATE_TAKEN, timeInMillis)
+                        put("datetaken", timeInMillis)
                     }
                 }
                 
-                contentResolver.update(item.uri, values, null, null)
-                pathsToScan.add(item.path)
+                try {
+                    contentResolver.update(item.uri, values, null, null)
+                } catch(e: Exception) {}
+                
+                android.media.MediaScannerConnection.scanFile(this@saveNewDateToItems, arrayOf(item.path), null) { _, uriToUpdate ->
+                    val finalUri = uriToUpdate ?: item.uri
+                    Thread {
+                        android.os.SystemClock.sleep(1000)
+                        try {
+                            contentResolver.update(finalUri, values, null, null)
+                        } catch(e: Exception) {
+                            try { contentResolver.update(item.uri, values, null, null) } catch (e2: Exception) {}
+                        }
+                        android.os.SystemClock.sleep(2000)
+                        try { contentResolver.update(finalUri, values, null, null) } catch(e: Exception) {}
+                    }.start()
+                }
                 
             } catch(e: Exception) {}
         }
         
+        prefs.edit().putStringSet("manually_edited_media", editedSet).apply()
+        
         withContext(Dispatchers.Main) {
-            if (pathsToScan.isNotEmpty()) {
-                android.media.MediaScannerConnection.scanFile(this@saveNewDateToItems, pathsToScan.toTypedArray(), null, null)
-            }
-            
-            val prefs = getSharedPreferences("GalleryPrefs", android.content.Context.MODE_PRIVATE)
             val sortOrder = prefs.getString("sort_order", "Değiştirilme (önce yeni)")
             
             when (sortOrder) {
@@ -711,39 +727,20 @@ fun MainActivity.repairMediaDates() {
         calToday.set(Calendar.MINUTE, 0)
         calToday.set(Calendar.SECOND, 0)
         val todayStartMillis = calToday.timeInMillis
+        
+        val prefs = getSharedPreferences("GalleryPrefs", android.content.Context.MODE_PRIVATE)
+        val editedSet = prefs.getStringSet("manually_edited_media", emptySet()) ?: emptySet()
 
         for (item in MainActivity.mediaList.toList()) {
+            if (editedSet.contains(item.path)) continue
+
             var targetMillis: Long? = null
             val file = File(item.path)
 
-            val epochMatcher = epochPattern.matcher(file.name)
-            val stdMatcher = namePattern.matcher(file.name)
-
-            if (epochMatcher.find()) {
-                targetMillis = epochMatcher.group(1)?.toLongOrNull()
-            } else if (stdMatcher.find()) {
-                try {
-                    val year = stdMatcher.group(1)?.toIntOrNull() ?: 0
-                    val month = (stdMatcher.group(2)?.toIntOrNull() ?: 1) - 1
-                    val day = stdMatcher.group(3)?.toIntOrNull() ?: 1
-                    
-                    if (year in 2000..2050 && month in 0..11 && day in 1..31) {
-                        val hour = stdMatcher.group(4)?.toIntOrNull() ?: 12
-                        val minute = stdMatcher.group(5)?.toIntOrNull() ?: 0
-                        val second = stdMatcher.group(6)?.toIntOrNull() ?: 0
-                        
-                        val cal = Calendar.getInstance()
-                        cal.set(year, month, day, hour, minute, second)
-                        targetMillis = cal.timeInMillis
-                    }
-                } catch (e: Exception) {}
-            }
-
-            if (targetMillis == null && !item.isVideo) {
+            if (!item.isVideo) {
                 try {
                     val exif = ExifInterface(item.path)
                     val dt = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
-                    
                     if (dt != null) {
                         val parsed = format.parse(dt)
                         if (parsed != null && parsed.time < todayStartMillis) {
@@ -751,6 +748,31 @@ fun MainActivity.repairMediaDates() {
                         }
                     }
                 } catch (e: Exception) {}
+            }
+
+            if (targetMillis == null) {
+                val epochMatcher = epochPattern.matcher(file.name)
+                val stdMatcher = namePattern.matcher(file.name)
+
+                if (epochMatcher.find()) {
+                    targetMillis = epochMatcher.group(1)?.toLongOrNull()
+                } else if (stdMatcher.find()) {
+                    try {
+                        val year = stdMatcher.group(1)?.toIntOrNull() ?: 0
+                        val month = (stdMatcher.group(2)?.toIntOrNull() ?: 1) - 1
+                        val day = stdMatcher.group(3)?.toIntOrNull() ?: 1
+                        
+                        if (year in 2000..2050 && month in 0..11 && day in 1..31) {
+                            val hour = stdMatcher.group(4)?.toIntOrNull() ?: 12
+                            val minute = stdMatcher.group(5)?.toIntOrNull() ?: 0
+                            val second = stdMatcher.group(6)?.toIntOrNull() ?: 0
+                            
+                            val cal = Calendar.getInstance()
+                            cal.set(year, month, day, hour, minute, second)
+                            targetMillis = cal.timeInMillis
+                        }
+                    } catch (e: Exception) {}
+                }
             }
 
             if (targetMillis != null) {
@@ -894,8 +916,19 @@ fun MainActivity.renameMediaFile(item: MediaItem, newNameWithExt: String) {
             
             if (sourceFile.exists() && !destFile.exists()) {
                 if (sourceFile.renameTo(destFile)) {
+                    try {
+                        val values = ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, newNameWithExt)
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                                put(MediaStore.MediaColumns.DATA, destFile.absolutePath)
+                            }
+                        }
+                        contentResolver.update(item.uri, values, null, null)
+                    } catch (e: Exception) {
+                        try { contentResolver.delete(item.uri, null, null) } catch (e2: Exception) {}
+                    }
+                    
                     android.media.MediaScannerConnection.scanFile(this@renameMediaFile, arrayOf(destFile.absolutePath), null, null)
-                    contentResolver.delete(item.uri, null, null)
                     
                     withContext(Dispatchers.Main) {
                         showNoIconToast("Yeniden isimlendirildi")

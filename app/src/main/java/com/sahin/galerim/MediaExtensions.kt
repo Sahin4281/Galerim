@@ -41,6 +41,8 @@ fun formatDuration(d: Long): String {
 
 fun MainActivity.loadMedia(uri: Uri, isImg: Boolean, list: MutableList<MediaItem>) {
     val activity = this
+    val prefs = activity.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val editedSet = prefs.getStringSet("manually_edited_media", emptySet()) ?: emptySet()
     val pr = mutableListOf(
         MediaStore.MediaColumns._ID, 
         MediaStore.MediaColumns.BUCKET_ID, 
@@ -66,13 +68,15 @@ fun MainActivity.loadMedia(uri: Uri, isImg: Boolean, list: MutableList<MediaItem
         val duC = if (!isImg) c.getColumnIndexOrThrow(pr[7]) else -1
         
         while (c.moveToNext()) {
+            val path = c.getString(pC)
             var dateSecs = c.getLong(dC)
             
-            if (dtC != -1) {
-                val dtMillis = c.getLong(dtC)
-                if (dtMillis > 0) {
-                    val dtSecs = dtMillis / 1000L
-                    dateSecs = minOf(dateSecs, dtSecs)
+            if (!editedSet.contains(path)) {
+                if (dtC != -1) {
+                    val dtMillis = c.getLong(dtC)
+                    if (dtMillis > 0) {
+                        dateSecs = dtMillis / 1000L
+                    }
                 }
             }
             
@@ -84,7 +88,7 @@ fun MainActivity.loadMedia(uri: Uri, isImg: Boolean, list: MutableList<MediaItem
                 dateSecs, 
                 if (!isImg) c.getLong(duC) else 0L, 
                 c.getLong(sC), 
-                c.getString(pC)
+                path
             ))
         }
     }
