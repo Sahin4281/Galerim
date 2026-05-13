@@ -365,6 +365,16 @@ fun FullScreenActivity.saveNewDate(newTime: Long) {
                         } catch (e: Exception) {}
                     }
                 }
+            } else {
+                val sourceFile = File(item.path)
+                val tempFile = File(sourceFile.parent, "temp_date_${System.currentTimeMillis()}_${sourceFile.name}")
+                val success = modifyVideoDateWithMp4Parser(sourceFile, tempFile, newTime)
+                if (success) {
+                    tempFile.copyTo(sourceFile, overwrite = true)
+                    tempFile.delete()
+                } else {
+                    tempFile.delete()
+                }
             }
 
             File(item.path).setLastModified(newTime)

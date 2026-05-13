@@ -21,6 +21,8 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import java.nio.ByteBuffer
 import android.os.Build
+import com.coremedia.iso.IsoFile
+import com.coremedia.iso.boxes.TrackBox
 
 fun MainActivity.performTrashRestore(items: List<MediaItem>) {
     if (items.isEmpty()) return
@@ -262,6 +264,16 @@ fun MainActivity.saveNewDateToItems(items: List<MediaItem>, cal: Calendar) {
                                 exif.saveAttributes()
                             } catch(e: Exception) {}
                         }
+                    }
+                } else {
+                    val sourceFile = File(item.path)
+                    val tempFile = File(sourceFile.parent, "temp_date_${System.currentTimeMillis()}_${sourceFile.name}")
+                    val success = modifyVideoDateWithMp4Parser(sourceFile, tempFile, timeInMillis)
+                    if (success) {
+                        tempFile.copyTo(sourceFile, overwrite = true)
+                        tempFile.delete()
+                    } else {
+                        tempFile.delete()
                     }
                 }
                 
@@ -793,6 +805,16 @@ fun MainActivity.repairMediaDates() {
                                     exif.saveAttributes()
                                 }
                             }
+                        } else {
+                            val sourceFile = File(item.path)
+                            val tempFile = File(sourceFile.parent, "temp_date_${System.currentTimeMillis()}_${sourceFile.name}")
+                            val success = modifyVideoDateWithMp4Parser(sourceFile, tempFile, targetMillis)
+                            if (success) {
+                                tempFile.copyTo(sourceFile, overwrite = true)
+                                tempFile.delete()
+                            } else {
+                                tempFile.delete()
+                            }
                         }
                         
                         file.setLastModified(targetMillis)
@@ -951,5 +973,34 @@ fun MainActivity.renameMediaFile(item: MediaItem, newNameWithExt: String) {
                 showNoIconToast("Bir hata oluştu")
             }
         }
+    }
+}
+
+fun modifyVideoDateWithMp4Parser(sourceFile: File, tempFile: File, newTimeInMillis: Long): Boolean {
+    try {
+        val isoFile = IsoFile(sourceFile.absolutePath)
+        val moov = isoFile.movieBox
+        val mvhd = moov.movieHeaderBox
+        val newDate = Date(newTimeInMillis)
+        
+        mvhd.creationTime = newDate
+        mvhd.modificationTime = newDate
+        
+        for (track in moov.getBoxes(TrackBox::class.java)) {
+            val tkhd = track.trackHeaderBox
+            tkhd.creationTime = newDate
+            tkhd.modificationTime = newDate
+            val mdhd = track.mediaBox.mediaHeaderBox
+            mdhd.creationTime = newDate
+            mdhd.modificationTime = newDate
+        }
+        
+        val fc = java.io.FileOutputStream(tempFile).channel
+        isoFile.getBox(fc)
+        fc.close()
+        isoFile.close()
+        return true
+    } catch (e: Exception) {
+        return false
     }
 }
