@@ -337,6 +337,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         super.onCreate(savedInstanceState)
+        
+        val pendingTempsStr = prefs.getString("pending_temp_files", "") ?: ""
+        if (pendingTempsStr.isNotEmpty()) {
+            val list = pendingTempsStr.split("|")
+            for (p in list) {
+                if (p.isNotEmpty()) {
+                    try {
+                        val f = File(p)
+                        if (f.exists()) f.delete()
+                    } catch (e: Exception) {}
+                }
+            }
+            prefs.edit().putString("pending_temp_files", "").apply()
+        }
+
         setContentView(R.layout.activity_main)
         supportActionBar?.hide()
 

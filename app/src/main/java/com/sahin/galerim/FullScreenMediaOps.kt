@@ -20,6 +20,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import android.os.Build
+import android.app.Dialog
 
 fun FullScreenActivity.handleEdit() {
     if (currentPosition >= MainActivity.displayedMediaList.size) return
@@ -341,7 +342,8 @@ fun FullScreenActivity.saveNewDate(newTime: Long) {
     val item = MainActivity.displayedMediaList[currentPosition]
     val dateStr = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(java.util.Date(newTime))
 
-    showFsCustomToast("Tarih güncelleniyor...", 0)
+    val progressDialog = createBlockingProgressDialog(this, "Tarih güncelleniyor, lütfen bekleyin...\nUygulamayı kapatmayın.")
+    progressDialog.show()
 
     lifecycleScope.launch(Dispatchers.IO) {
         val timeInSeconds = newTime / 1000L
@@ -368,13 +370,13 @@ fun FullScreenActivity.saveNewDate(newTime: Long) {
             } else {
                 val sourceFile = File(item.path)
                 val tempFile = File(sourceFile.parent, "temp_date_${System.currentTimeMillis()}_${sourceFile.name}")
+                addTempFileToCleanup(this@saveNewDate, tempFile.absolutePath)
                 val success = modifyVideoDateWithMp4Parser(sourceFile, tempFile, newTime)
                 if (success) {
                     tempFile.copyTo(sourceFile, overwrite = true)
-                    tempFile.delete()
-                } else {
-                    tempFile.delete()
                 }
+                tempFile.delete()
+                removeTempFileFromCleanup(this@saveNewDate, tempFile.absolutePath)
             }
 
             File(item.path).setLastModified(newTime)
@@ -406,12 +408,14 @@ fun FullScreenActivity.saveNewDate(newTime: Long) {
             }
             
             Handler(Looper.getMainLooper()).post {
+                progressDialog.dismiss()
                 showFsCustomToast("Tarih başarıyla güncellendi", 0)
                 MainActivity.mediaList.sortByDescending { it.dateAdded }
                 MainActivity.forceReload = true
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
+                progressDialog.dismiss()
                 showFsCustomToast("Hata: İşlem başarısız", 0)
             }
         }
@@ -428,7 +432,9 @@ fun convertFsDecimalToDMS(coord: Double): String {
 }
 
 fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
-    showFsCustomToast("Konum temizleniyor", 0)
+    val progressDialog = createBlockingProgressDialog(this, "Konum temizleniyor, lütfen bekleyin...\nUygulamayı kapatmayın.")
+    progressDialog.show()
+    
     lifecycleScope.launch(Dispatchers.IO) {
         val item = items.first()
         var isCleaned = false
@@ -487,13 +493,27 @@ fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
             try {
                 val sourceFile = File(item.path)
                 val tempFile = File(sourceFile.parent, "temp_loc_clear_${System.currentTimeMillis()}_${sourceFile.name}")
+                addTempFileToCleanup(this@clearLocationData, tempFile.absolutePath)
 
                 val success = modifyVideoLocationWithMuxer(sourceFile, tempFile, null, null)
 
                 if (success) {
-                    tempFile.copyTo(sourceFile, overwrite = true)
+                    val tempFile2 = File(sourceFile.parent, "temp_loc_date_${System.currentTimeMillis()}_${sourceFile.name}")
+                    addTempFileToCleanup(this@clearLocationData, tempFile2.absolutePath)
+                    
+                    val dateFixed = modifyVideoDateWithMp4Parser(tempFile, tempFile2, realDateTaken)
+                    if (dateFixed) {
+                        tempFile2.copyTo(sourceFile, overwrite = true)
+                    } else {
+                        tempFile.copyTo(sourceFile, overwrite = true)
+                    }
+                    
                     sourceFile.setLastModified(originalLastModified)
                     tempFile.delete()
+                    tempFile2.delete()
+                    removeTempFileFromCleanup(this@clearLocationData, tempFile.absolutePath)
+                    removeTempFileFromCleanup(this@clearLocationData, tempFile2.absolutePath)
+                    
                     MediaScannerConnection.scanFile(this@clearLocationData, arrayOf(sourceFile.absolutePath), null) { _, uriToUpdate ->
                         val finalUri = uriToUpdate ?: item.uri
                         try {
@@ -511,6 +531,7 @@ fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
                     isCleaned = true
                 } else {
                     tempFile.delete()
+                    removeTempFileFromCleanup(this@clearLocationData, tempFile.absolutePath)
                 }
             } catch (e: Exception) {}
         }
@@ -521,6 +542,7 @@ fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
         }
 
         withContext(Dispatchers.Main) {
+            progressDialog.dismiss()
             if (isCleaned) {
                 val typeStr = if (item.isVideo) "videonun" else "dosyanın"
                 showFsCustomToast("1 $typeStr konumu temizlendi", 0)
@@ -532,6 +554,9 @@ fun FullScreenActivity.clearLocationData(items: List<MediaItem>) {
 }
 
 fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, lng: Double) {
+    val progressDialog = createBlockingProgressDialog(this, "Konum işleniyor, lütfen bekleyin...\nUygulamayı kapatmayın.")
+    progressDialog.show()
+    
     lifecycleScope.launch(Dispatchers.IO) {
         val latStr = convertFsDecimalToDMS(lat)
         val lngStr = convertFsDecimalToDMS(lng)
@@ -575,10 +600,6 @@ fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, l
                     } catch(e: Exception){}
                 }
             }
-        }
-
-        withContext(Dispatchers.Main) {
-            showFsCustomToast(if (hadLoc) "Konum güncelleniyor" else "Konum ekleniyor", 0)
         }
 
         var realDateAdded = originalDateAdded
@@ -631,13 +652,27 @@ fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, l
             try {
                 val sourceFile = File(item.path)
                 val tempFile = File(sourceFile.parent, "temp_loc_${System.currentTimeMillis()}_${sourceFile.name}")
+                addTempFileToCleanup(this@updateLocationData, tempFile.absolutePath)
 
                 val success = modifyVideoLocationWithMuxer(sourceFile, tempFile, lat, lng)
 
                 if (success) {
-                    tempFile.copyTo(sourceFile, overwrite = true)
+                    val tempFile2 = File(sourceFile.parent, "temp_loc_date_${System.currentTimeMillis()}_${sourceFile.name}")
+                    addTempFileToCleanup(this@updateLocationData, tempFile2.absolutePath)
+                    
+                    val dateFixed = modifyVideoDateWithMp4Parser(tempFile, tempFile2, realDateTaken)
+                    if (dateFixed) {
+                        tempFile2.copyTo(sourceFile, overwrite = true)
+                    } else {
+                        tempFile.copyTo(sourceFile, overwrite = true)
+                    }
+                    
                     sourceFile.setLastModified(originalLastModified)
                     tempFile.delete()
+                    tempFile2.delete()
+                    removeTempFileFromCleanup(this@updateLocationData, tempFile.absolutePath)
+                    removeTempFileFromCleanup(this@updateLocationData, tempFile2.absolutePath)
+                    
                     MediaScannerConnection.scanFile(this@updateLocationData, arrayOf(sourceFile.absolutePath), null) { _, uriToUpdate ->
                         val finalUri = uriToUpdate ?: item.uri
                         try {
@@ -655,6 +690,7 @@ fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, l
                     isUpdated = true
                 } else {
                     tempFile.delete()
+                    removeTempFileFromCleanup(this@updateLocationData, tempFile.absolutePath)
                 }
             } catch(e: Exception) {}
         }
@@ -665,6 +701,7 @@ fun FullScreenActivity.updateLocationData(items: List<MediaItem>, lat: Double, l
         }
 
         withContext(Dispatchers.Main) {
+            progressDialog.dismiss()
             if (isUpdated) {
                 val msg = if (hadLoc) {
                     if (item.isVideo) "1 videonun konumu güncellendi" else "1 dosyanın konumu güncellendi"

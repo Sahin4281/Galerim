@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ProgressBar
 import androidx.appcompat.widget.AppCompatButton
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
@@ -692,4 +693,48 @@ fun MainActivity.showCustomToast(context: Context, message: String, iconResId: I
     toast.duration = Toast.LENGTH_SHORT
     toast.view = layout
     toast.show()
+}
+
+fun createBlockingProgressDialog(context: Context, message: String): android.app.Dialog {
+    val dialog = android.app.Dialog(context)
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+    dialog.setCancelable(false)
+    dialog.setCanceledOnTouchOutside(false)
+    val layout = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(64, 64, 64, 64)
+        background = GradientDrawable().apply {
+            setColor(Color.parseColor("#333333"))
+            cornerRadius = 45f
+        }
+    }
+    val pb = ProgressBar(context)
+    layout.addView(pb)
+    val tv = TextView(context).apply {
+        text = message
+        setTextColor(Color.WHITE)
+        textSize = 16f
+        setPadding(0, 32, 0, 0)
+        gravity = Gravity.CENTER
+    }
+    layout.addView(tv)
+    dialog.setContentView(layout)
+    dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+    return dialog
+}
+
+fun addTempFileToCleanup(context: Context, path: String) {
+    val prefs = context.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val current = prefs.getString("pending_temp_files", "") ?: ""
+    val newList = if (current.isEmpty()) path else "$current|$path"
+    prefs.edit().putString("pending_temp_files", newList).apply()
+}
+
+fun removeTempFileFromCleanup(context: Context, path: String) {
+    val prefs = context.getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE)
+    val current = prefs.getString("pending_temp_files", "") ?: ""
+    val list = current.split("|").toMutableList()
+    list.remove(path)
+    prefs.edit().putString("pending_temp_files", list.joinToString("|")).apply()
 }
