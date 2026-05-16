@@ -36,6 +36,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import androidx.appcompat.widget.AppCompatButton
 import com.sahin.galerim.data.AppDatabase
 import com.sahin.galerim.data.HiddenMedia
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +54,8 @@ class HiddenMediaActivity : AppCompatActivity() {
     private lateinit var emptyView: View
     private lateinit var selectionBar: View
     private lateinit var btnSelectAll: TextView
+    private lateinit var tvHiddenTitle: TextView
+    private lateinit var tvHiddenTitleCount: TextView
     private val hiddenList = mutableListOf<HiddenMedia>()
     private val selectedItems = mutableSetOf<HiddenMedia>()
     private var isSelectionMode = false
@@ -104,6 +108,8 @@ class HiddenMediaActivity : AppCompatActivity() {
         emptyView = findViewById(R.id.emptyView)
         selectionBar = findViewById(R.id.selectionBar)
         btnSelectAll = findViewById(R.id.btnSelectAll)
+        tvHiddenTitle = findViewById(R.id.tvHiddenTitle)
+        tvHiddenTitleCount = findViewById(R.id.tvHiddenTitleCount)
 
         ViewCompat.setOnApplyWindowInsetsListener(selectionBar) { v, insets ->
             val sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -125,7 +131,7 @@ class HiddenMediaActivity : AppCompatActivity() {
         recyclerView.adapter = HiddenAdapter()
 
         findViewById<View>(R.id.btnRestore).setOnClickListener { restoreSelectedItems() }
-        findViewById<View>(R.id.btnDelete).setOnClickListener { deleteSelectedItemsPermanently() }
+        findViewById<View>(R.id.btnDelete).setOnClickListener { showDeleteConfirmationDialog() }
 
         btnSelectAll.setOnClickListener {
             if (selectedItems.size == hiddenList.size) {
@@ -134,7 +140,7 @@ class HiddenMediaActivity : AppCompatActivity() {
             } else {
                 selectedItems.clear()
                 selectedItems.addAll(hiddenList)
-                updateSelectAllText()
+                updateSelectionUI()
                 recyclerView.adapter?.notifyDataSetChanged()
             }
         }
@@ -255,10 +261,12 @@ class HiddenMediaActivity : AppCompatActivity() {
         selectionBarView?.setBackgroundColor(dynamicBarColor)
 
         val adaptiveTextColor = if (isDarkBg) Color.WHITE else Color.BLACK
+        val adaptiveSecondaryColor = Color.argb(178, Color.red(adaptiveTextColor), Color.green(adaptiveTextColor), Color.blue(adaptiveTextColor))
 
-        findViewById<TextView>(R.id.tvHiddenTitle)?.setTextColor(adaptiveTextColor)
+        tvHiddenTitle.setTextColor(adaptiveTextColor)
+        tvHiddenTitleCount.setTextColor(adaptiveSecondaryColor)
         findViewById<ImageView>(R.id.btnBack)?.setColorFilter(adaptiveTextColor)
-        findViewById<TextView>(R.id.btnSelectAll)?.setTextColor(adaptiveTextColor)
+        btnSelectAll.setTextColor(adaptiveTextColor)
 
         val emptyView = findViewById<LinearLayout>(R.id.emptyView)
         emptyView?.let { layout ->
@@ -283,6 +291,18 @@ class HiddenMediaActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 hiddenList.clear()
                 hiddenList.addAll(list)
+                
+                var photoCount = 0
+                var videoCount = 0
+                list.forEach { if (it.isVideo) videoCount++ else photoCount++ }
+                val countText = when {
+                    photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf $videoCount video"
+                    videoCount > 0 -> "$videoCount video"
+                    photoCount > 0 -> "$photoCount fotoğraf"
+                    else -> ""
+                }
+                tvHiddenTitleCount.text = countText
+                
                 recyclerView.adapter?.notifyDataSetChanged()
                 emptyView.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             }
@@ -402,6 +422,84 @@ class HiddenMediaActivity : AppCompatActivity() {
         }
     }
 
+    private fun showDeleteConfirmationDialog() {
+        if (selectedItems.isEmpty()) return
+        val dialogBgColor = ContextCompat.getColor(this, R.color.p_app_dialog_bg)
+        val primaryColor = ContextCompat.getColor(this, R.color.p_app_text_primary)
+        val isAmoledTheme = getSharedPreferences("GalleryPrefs", Context.MODE_PRIVATE).getString("appTheme", "Sistem Teması") == "Koyu Amoled Tema"
+        
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_trash_confirmation, null)
+        dialog.setContentView(view)
+        
+        view.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 60f
+            setColor(if (isAmoledTheme) Color.BLACK else dialogBgColor)
+        }
+        dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+        
+        val messageView = view.findViewById<TextView>(R.id.dialogMessage)
+        messageView.gravity = Gravity.CENTER
+        messageView.setTextColor(primaryColor)
+
+        var photoCount = 0
+        var videoCount = 0
+        selectedItems.forEach { if (it.isVideo) videoCount++ else photoCount++ }
+        
+        val itemsText = when {
+            photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf ve $videoCount video"
+            photoCount > 0 -> "$photoCount fotoğraf"
+            videoCount > 0 -> "$videoCount video"
+            else -> ""
+        }
+        messageView.text = "$itemsText kalıcı olarak silinsin mi?"
+        
+        val btnConfirm = view.findViewById<AppCompatButton>(R.id.btnConfirm)
+        val parentLayout = btnConfirm.parent as? ViewGroup
+        
+        if (parentLayout is LinearLayout) {
+            parentLayout.removeAllViews()
+            parentLayout.gravity = Gravity.CENTER
+            
+            val dp10 = (10 * resources.displayMetrics.density).toInt()
+            val btnWidth = (110 * resources.displayMetrics.density).toInt() 
+            val btnHeight = (42 * resources.displayMetrics.density).toInt()
+            
+            val btnCancelNew = AppCompatButton(this).apply {
+                text = "Hayır"
+                setTextColor(Color.WHITE)
+                isAllCaps = false
+                textSize = 15f
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#4CAF50")) 
+                    cornerRadius = 30f
+                }
+                layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginEnd = dp10 }
+                setOnClickListener { dialog.dismiss() }
+            }
+            
+            val btnConfirmNew = AppCompatButton(this).apply {
+                text = "Evet"
+                setTextColor(Color.WHITE)
+                isAllCaps = false
+                textSize = 15f
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#FF5252")) 
+                    cornerRadius = 30f
+                }
+                layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginStart = dp10 }
+                setOnClickListener {
+                    dialog.dismiss()
+                    deleteSelectedItemsPermanently()
+                }
+            }
+            parentLayout.addView(btnCancelNew)
+            parentLayout.addView(btnConfirmNew)
+        }
+        dialog.show()
+    }
+
     private fun deleteSelectedItemsPermanently() {
         if (selectedItems.isEmpty()) return
         
@@ -431,11 +529,31 @@ class HiddenMediaActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateSelectAllText() {
-        if (selectedItems.size == hiddenList.size && hiddenList.isNotEmpty()) {
-            btnSelectAll.text = "Hiçbirini Seçme"
+    private fun updateSelectionUI() {
+        if (isSelectionMode) {
+            var photoCount = 0
+            var videoCount = 0
+            selectedItems.forEach { if (it.isVideo) videoCount++ else photoCount++ }
+            
+            val selectionText = when {
+                photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf, $videoCount video seçili"
+                photoCount > 0 -> "$photoCount fotoğraf seçili"
+                videoCount > 0 -> "$videoCount video seçili"
+                else -> "0 seçili"
+            }
+            tvHiddenTitle.text = selectionText
+            tvHiddenTitle.textSize = 14f
+            tvHiddenTitleCount.visibility = View.GONE
+            
+            if (selectedItems.size == hiddenList.size && hiddenList.isNotEmpty()) {
+                btnSelectAll.text = "Hiçbirini Seçme"
+            } else {
+                btnSelectAll.text = "Hepsini Seç"
+            }
         } else {
-            btnSelectAll.text = "Hepsini Seç"
+            tvHiddenTitle.text = "Gizli Klasör"
+            tvHiddenTitle.textSize = 20f
+            tvHiddenTitleCount.visibility = View.VISIBLE
         }
     }
 
@@ -444,6 +562,7 @@ class HiddenMediaActivity : AppCompatActivity() {
         selectedItems.clear()
         selectionBar.visibility = View.GONE
         btnSelectAll.visibility = View.GONE
+        updateSelectionUI()
         recyclerView.adapter?.notifyDataSetChanged()
     }
 
@@ -534,7 +653,7 @@ class HiddenMediaActivity : AppCompatActivity() {
                     if (selectedItems.isEmpty()) {
                         exitSelectionMode()
                     } else {
-                        updateSelectAllText()
+                        updateSelectionUI()
                         notifyItemChanged(position)
                     }
                 } else {
@@ -553,7 +672,7 @@ class HiddenMediaActivity : AppCompatActivity() {
                     selectedItems.add(item)
                     selectionBar.visibility = View.VISIBLE
                     btnSelectAll.visibility = View.VISIBLE
-                    updateSelectAllText()
+                    updateSelectionUI()
                     notifyDataSetChanged()
                 }
                 true

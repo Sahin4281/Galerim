@@ -69,6 +69,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
 import com.sahin.galerim.utils.BiometricHelper
+import com.sahin.galerim.utils.PopupMenuHelper
 import com.sahin.galerim.data.AppDatabase
 import com.sahin.galerim.data.HiddenMedia
 
@@ -201,7 +202,6 @@ class MainActivity : AppCompatActivity() {
     
     var isShowingTrash = false
     var isShowingFavorites = false
-    var isShowingPlaces = false
     var isShowingLocations = false
     
     var isSearchMode = false
@@ -391,11 +391,13 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnBackFromTrash)?.setOnClickListener {
             resetStates()
             bottomTabLayout.getTabAt(0)?.select()
+            updateTabAppearance(0)
         }
 
         findViewById<View>(R.id.btnBackFromFavorites)?.setOnClickListener {
             resetStates()
             bottomTabLayout.getTabAt(0)?.select()
+            updateTabAppearance(0)
         }
 
         findViewById<View>(R.id.btnTrashEdit)?.setOnClickListener {
@@ -496,7 +498,6 @@ class MainActivity : AppCompatActivity() {
                     filterBucketId = null
                     filterLocation = null
                     isShowingLocations = false
-                    isShowingPlaces = false
                     allRecycler.visibility = View.GONE
                     albumsRecycler.visibility = View.VISIBLE
                     albumsRecycler.adapter?.notifyDataSetChanged()
@@ -505,11 +506,18 @@ class MainActivity : AppCompatActivity() {
                     mainTitle.visibility = View.GONE
                     topIconsContainer.visibility = View.GONE
                     
-                } else if (isShowingTrash || isShowingFavorites || isShowingPlaces || isShowingLocations) { 
+                    bottomTabLayout.getTabAt(2)?.select()
+                    updateTabAppearance(2)
+                } else if (isShowingTrash || isShowingFavorites || isShowingLocations) { 
                     resetStates()
                     bottomTabLayout.getTabAt(0)?.select() 
+                    updateTabAppearance(0)
                 } else if (bottomTabLayout.selectedTabPosition != 0) {
                     bottomTabLayout.getTabAt(0)?.select()
+                    updateTabAppearance(0)
+                    allRecycler.visibility = View.VISIBLE
+                    albumsRecycler.visibility = View.GONE
+                    loadDisplayedList()
                 } else { 
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -519,6 +527,47 @@ class MainActivity : AppCompatActivity() {
         })
         
         checkAndRequestPermission()
+        handleIntentExtras(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentExtras(intent)
+    }
+
+    private fun handleIntentExtras(intent: Intent?) {
+        val albumId = intent?.getLongExtra("open_album_id", -1L) ?: -1L
+        if (albumId != -1L) {
+            val albumName = intent?.getStringExtra("open_album_name") ?: ""
+            openAlbumFromMap(albumId, albumName)
+            intent?.removeExtra("open_album_id")
+            intent?.removeExtra("open_album_name")
+        }
+    }
+
+    private fun openAlbumFromMap(bucketId: Long, bucketName: String) {
+        bottomTabLayout.getTabAt(2)?.select()
+        updateTabAppearance(2)
+        
+        filterBucketId = bucketId
+        filterLocation = null
+        isShowingLocations = false
+        isShowingTrash = false
+        isShowingFavorites = false
+        if (isSearchMode) closeSearchMode()
+        if (isSelectionMode) exitSelectionMode()
+        
+        allRecycler.visibility = View.VISIBLE
+        albumsRecycler.visibility = View.GONE
+        
+        val stickyHeader = findViewById<View>(R.id.albumStickyHeader)
+        stickyHeader?.visibility = View.VISIBLE
+        mainTitle.visibility = View.VISIBLE
+        mainTitle.text = bucketName
+        topIconsContainer.visibility = View.VISIBLE
+        
+        loadDisplayedList()
     }
 
     fun updateAlbumSelectionUI() {

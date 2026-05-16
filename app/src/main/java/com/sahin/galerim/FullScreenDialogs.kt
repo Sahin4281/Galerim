@@ -8,6 +8,8 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.location.Geocoder
 import android.media.ExifInterface
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.provider.MediaStore
@@ -861,7 +863,22 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
                     retrieverRes.setDataSource(this@showModernDetailsBottomSheet, item.uri)
                     val w = retrieverRes.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt() ?: 0
                     val h = retrieverRes.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt() ?: 0
-                    if (w > 0 && h > 0) resolutionStr = "${w}x${h}  |  ${String.format("%.1f", (w * h) / 1000000.0)}MP"
+                    if (w > 0 && h > 0) {
+                        val maxDim = maxOf(w, h)
+                        val resLabel = when {
+                            maxDim >= 7680 -> "8K"
+                            maxDim >= 3840 -> "UHD"
+                            maxDim >= 2560 -> "QHD"
+                            maxDim >= 1920 -> "FHD"
+                            maxDim >= 1280 -> "HD"
+                            maxDim >= 640 -> "SD"
+                            else -> ""
+                        }
+                        resolutionStr = "${w}x${h}  |  ${String.format("%.1f", (w * h) / 1000000.0)}MP"
+                        if (resLabel.isNotEmpty()) {
+                            resolutionStr += "  |  $resLabel"
+                        }
+                    }
                 } catch (e: Exception) {}
                 finally { try { retrieverRes.release() } catch (e: Exception) {} }
             } catch (e: Exception) {}
@@ -907,13 +924,91 @@ fun FullScreenActivity.showModernDetailsBottomSheet() {
         }
     } catch (e: Exception) {}
 
-    val info = arrayOf(
+    val infoList = mutableListOf(
         "Dosya adı:", file.name, 
         "Konum:", locationStr, 
         "Dosya yolu:", readablePath, 
         "Boyut:", String.format("%.2f MB", item.size / (1024.0 * 1024.0)), 
         "Çözünürlük:", resolutionStr
     )
+    
+    if (item.isVideo) {
+        var durationStr = formatDuration(item.duration)
+        var codecStr = "Bilinmiyor"
+        var fpsStr = "Bilinmiyor"
+        var audioCodecStr = ""
+
+        val extractor = MediaExtractor()
+        try {
+            try {
+                extractor.setDataSource(item.path)
+            } catch (e: Exception) {
+                extractor.setDataSource(this@showModernDetailsBottomSheet, item.uri, null)
+            }
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME)
+                if (mime?.startsWith("video/") == true) {
+                    codecStr = when (mime) {
+                        "video/avc" -> "H.264"
+                        "video/hevc" -> "HEVC"
+                        "video/mp4v-es" -> "MPEG-4"
+                        "video/3gpp" -> "3GPP"
+                        "video/x-vnd.on2.vp8" -> "VP8"
+                        "video/x-vnd.on2.vp9" -> "VP9"
+                        "video/av01" -> "AV1"
+                        else -> mime.removePrefix("video/").uppercase(Locale("tr"))
+                    }
+                    if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                        try {
+                            val fps = format.getInteger(MediaFormat.KEY_FRAME_RATE)
+                            fpsStr = "${fps}fps"
+                        } catch (e: Exception) {
+                            try {
+                                val fpsFloat = format.getFloat(MediaFormat.KEY_FRAME_RATE)
+                                fpsStr = "${fpsFloat.toInt()}fps"
+                            } catch (e2: Exception) {}
+                        }
+                    }
+                    if (item.duration == 0L && format.containsKey(MediaFormat.KEY_DURATION)) {
+                        try {
+                            val dUs = format.getLong(MediaFormat.KEY_DURATION)
+                            durationStr = formatDuration(dUs / 1000)
+                        } catch (e: Exception) {}
+                    }
+                } else if (mime?.startsWith("audio/") == true) {
+                    audioCodecStr = when (mime) {
+                        "audio/mp4a-latm" -> "AAC"
+                        "audio/mpeg" -> "MP3"
+                        "audio/flac" -> "FLAC"
+                        "audio/ac3" -> "AC3"
+                        "audio/eac3" -> "E-AC3"
+                        "audio/vorbis" -> "Vorbis"
+                        "audio/opus" -> "Opus"
+                        "audio/amr-nb" -> "AMR-NB"
+                        "audio/amr-wb" -> "AMR-WB"
+                        else -> mime.removePrefix("audio/").uppercase(Locale("tr"))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+        } finally {
+            try { extractor.release() } catch (e: Exception) {}
+        }
+        
+        val videoDetailsList = mutableListOf<String>()
+        if (durationStr != "00:00" && durationStr != "00:00:00") videoDetailsList.add(durationStr)
+        if (codecStr != "Bilinmiyor") videoDetailsList.add(codecStr)
+        if (audioCodecStr.isNotEmpty()) videoDetailsList.add(audioCodecStr)
+        if (fpsStr != "Bilinmiyor") videoDetailsList.add(fpsStr)
+        
+        if (videoDetailsList.isNotEmpty()) {
+            infoList.add("Video Bilgisi:")
+            infoList.add(videoDetailsList.joinToString("  |  "))
+        }
+    }
+
+    val info = infoList.toTypedArray()
     
     for (i in info.indices step 2) {
         layout.addView(TextView(this).apply { text = info[i]; setTextColor(secondaryColor); textSize = 13f })

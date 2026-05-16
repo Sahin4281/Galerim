@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/action_details" android:title="Ayrıntılar" />
+    <item android:id="@+id/action_rename" android:title="Yeniden isimlendir" />
+    <item android:id="@+id/action_favorite" android:title="Favorilere ekle" />
+    <item android:id="@+id/action_hide" android:title="Gizle" />
+    <item android:id="@+id/action_copy_to_album" android:title="Albüme kopyala" />
+    <item android:id="@+id/action_move_to_album" android:title="Albüme taşı" />
+    <item android:id="@+id/action_edit_date_time" android:title="Tarih ve saati düzenle" />
+    <item android:id="@+id/action_edit_location" android:title="Konumu düzenle" />
+</menu>

@@ -29,6 +29,8 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
 import com.github.chrisbanes.photoview.PhotoView
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import androidx.appcompat.widget.AppCompatButton
 import com.sahin.galerim.data.AppDatabase
 import com.sahin.galerim.data.HiddenMedia
 import kotlinx.coroutines.Dispatchers
@@ -123,7 +125,7 @@ class HiddenFullScreenActivity : AppCompatActivity() {
         }
 
         customBottomBar.findViewById<View>(R.id.btnRestoreContainer).setOnClickListener { restoreCurrentItem() }
-        customBottomBar.findViewById<View>(R.id.btnDeleteContainer).setOnClickListener { deleteCurrentItem() }
+        customBottomBar.findViewById<View>(R.id.btnDeleteContainer).setOnClickListener { showDeleteConfirmationDialog() }
 
         ViewCompat.setOnApplyWindowInsetsListener(customBottomBar) { v, insets ->
             val sysBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -343,6 +345,75 @@ class HiddenFullScreenActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showDeleteConfirmationDialog() {
+        if (currentHiddenList.isEmpty()) return
+        val item = currentHiddenList[currentPosition]
+        val dialogBgColor = ContextCompat.getColor(this, R.color.p_app_dialog_bg)
+        val primaryColor = ContextCompat.getColor(this, R.color.p_app_text_primary)
+        
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_trash_confirmation, null)
+        dialog.setContentView(view)
+        
+        view.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 60f
+            setColor(if (isAmoledTheme) Color.BLACK else dialogBgColor)
+        }
+        dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.setBackgroundColor(Color.TRANSPARENT)
+        
+        val messageView = view.findViewById<TextView>(R.id.dialogMessage)
+        messageView.gravity = Gravity.CENTER
+        messageView.setTextColor(primaryColor)
+
+        val itemType = if (item.isVideo) "video" else "fotoğraf"
+        messageView.text = "1 $itemType kalıcı olarak silinsin mi?"
+        
+        val btnConfirm = view.findViewById<AppCompatButton>(R.id.btnConfirm)
+        val parentLayout = btnConfirm.parent as? ViewGroup
+        
+        if (parentLayout is LinearLayout) {
+            parentLayout.removeAllViews()
+            parentLayout.gravity = Gravity.CENTER
+            
+            val dp10 = (10 * resources.displayMetrics.density).toInt()
+            val btnWidth = (110 * resources.displayMetrics.density).toInt() 
+            val btnHeight = (42 * resources.displayMetrics.density).toInt()
+            
+            val btnCancelNew = AppCompatButton(this).apply {
+                text = "Hayır"
+                setTextColor(Color.WHITE)
+                isAllCaps = false
+                textSize = 15f
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#4CAF50")) 
+                    cornerRadius = 30f
+                }
+                layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginEnd = dp10 }
+                setOnClickListener { dialog.dismiss() }
+            }
+            
+            val btnConfirmNew = AppCompatButton(this).apply {
+                text = "Evet"
+                setTextColor(Color.WHITE)
+                isAllCaps = false
+                textSize = 15f
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#FF5252")) 
+                    cornerRadius = 30f
+                }
+                layoutParams = LinearLayout.LayoutParams(btnWidth, btnHeight).apply { marginStart = dp10 }
+                setOnClickListener {
+                    dialog.dismiss()
+                    deleteCurrentItem()
+                }
+            }
+            parentLayout.addView(btnCancelNew)
+            parentLayout.addView(btnConfirmNew)
+        }
+        dialog.show()
     }
 
     private fun deleteCurrentItem() {

@@ -213,6 +213,7 @@ fun MainActivity.applyDynamicColorsToUI() {
     }
     
     activity.findViewById<TextView>(R.id.tvTrashTitleCount)?.setTextColor(adaptiveSecondaryColor)
+    activity.findViewById<TextView>(R.id.tvFavoritesTitleCount)?.setTextColor(adaptiveSecondaryColor)
     activity.findViewById<TextView>(R.id.btnTrashEdit)?.setTextColor(adaptiveTextColor)
     activity.findViewById<ImageView>(R.id.btnTrashMore)?.setColorFilter(adaptiveTextColor)
     
@@ -254,21 +255,22 @@ fun MainActivity.applyDynamicColorsToUI() {
 fun MainActivity.updateEmptyStateUI() {
     val activity = this
     val coordinatorLayout = activity.findViewById<View>(R.id.coordinatorLayout)
+    val density = activity.resources.displayMetrics.density
+    val dp8 = (8 * density).toInt()
     
     if (activity.isShowingTrash) {
         coordinatorLayout?.visibility = View.GONE
         activity.albumsRecycler.visibility = View.GONE
         activity.fastScrollContainer.visibility = View.GONE
-        activity.trashTopBar.visibility = View.VISIBLE
+        
+        activity.trashTopBar.visibility = if (activity.isSelectionMode) View.GONE else View.VISIBLE
         activity.favoritesTopBar.visibility = View.GONE
         activity.emptyFavoritesView.visibility = View.GONE
         activity.emptySearchView.visibility = View.GONE
         
         if (!activity.isSelectionMode) {
             activity.bottomTabLayout.visibility = View.GONE
-            activity.trashTopBar.post {
-                activity.allRecycler.setPadding(0, activity.trashTopBar.height, 0, 0)
-            }
+            activity.allRecycler.setPadding(dp8, 0, dp8, 0)
         }
         
         val tvTrashTitleCount = activity.findViewById<TextView>(R.id.tvTrashTitleCount)
@@ -305,20 +307,32 @@ fun MainActivity.updateEmptyStateUI() {
         activity.fastScrollContainer.visibility = View.GONE
         activity.trashTopBar.visibility = View.GONE
         activity.emptyTrashView.visibility = View.GONE
-        activity.favoritesTopBar.visibility = View.VISIBLE
+        
+        activity.favoritesTopBar.visibility = if (activity.isSelectionMode) View.GONE else View.VISIBLE
         activity.emptySearchView.visibility = View.GONE
         
         if (!activity.isSelectionMode) {
             activity.bottomTabLayout.visibility = View.GONE
-            activity.favoritesTopBar.post {
-                activity.allRecycler.setPadding(0, activity.favoritesTopBar.height, 0, 0)
-            }
+            activity.allRecycler.setPadding(dp8, 0, dp8, 0)
         }
 
+        val tvFavoritesTitleCount = activity.findViewById<TextView>(R.id.tvFavoritesTitleCount)
+
         if (MainActivity.displayedMediaList.isEmpty()) {
+            tvFavoritesTitleCount?.visibility = View.GONE
             activity.emptyFavoritesView.visibility = View.VISIBLE
             activity.allRecycler.visibility = View.GONE
         } else {
+            tvFavoritesTitleCount?.visibility = View.VISIBLE
+            val photoCount = MainActivity.displayedMediaList.count { !it.isVideo }
+            val videoCount = MainActivity.displayedMediaList.count { it.isVideo }
+            val countText = when {
+                photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf $videoCount video"
+                videoCount > 0 -> "$videoCount video"
+                photoCount > 0 -> "$photoCount fotoğraf"
+                else -> ""
+            }
+            tvFavoritesTitleCount?.text = countText
             activity.emptyFavoritesView.visibility = View.GONE
             coordinatorLayout?.visibility = View.VISIBLE
             activity.allRecycler.visibility = View.VISIBLE
@@ -328,11 +342,11 @@ fun MainActivity.updateEmptyStateUI() {
         activity.emptyTrashView.visibility = View.GONE
         activity.emptyFavoritesView.visibility = View.GONE
         
+        val sc = activity.findViewById<View>(R.id.searchContainer)
+        sc?.visibility = if (activity.isSelectionMode) View.GONE else View.VISIBLE
+
         if (!activity.isSelectionMode) {
-            val sc = activity.findViewById<View>(R.id.searchContainer)
-            sc?.post {
-                activity.allRecycler.setPadding(0, sc.height, 0, 0)
-            }
+            activity.allRecycler.setPadding(dp8, 0, dp8, 0)
         }
 
         if (MainActivity.displayedMediaList.isEmpty()) {
@@ -360,7 +374,7 @@ fun MainActivity.updateEmptyStateUI() {
         
         if (!activity.isSelectionMode) {
             activity.bottomTabLayout.visibility = View.VISIBLE
-            activity.allRecycler.setPadding(0, 0, 0, 0)
+            activity.allRecycler.setPadding(dp8, 0, dp8, 0)
         }
     }
 }
@@ -380,11 +394,34 @@ fun MainActivity.updateSelectionUI() {
     activity.selectionTopBar.visibility = View.VISIBLE
     activity.selectionBottomBar.visibility = View.VISIBLE
     activity.bottomTabLayout.visibility = View.GONE
-    activity.tvSelectionCount.text = "${activity.selectedMedia.size} seçili" 
-    
-    activity.selectionTopBar.post {
-        activity.allRecycler.setPadding(0, activity.selectionTopBar.height, 0, 0)
+
+    if (activity.isShowingTrash) {
+        activity.trashTopBar.visibility = View.GONE
     }
+    if (activity.isShowingFavorites) {
+        activity.favoritesTopBar.visibility = View.GONE
+    }
+    if (activity.isSearchMode) {
+        activity.findViewById<View>(R.id.searchContainer)?.visibility = View.GONE
+    }
+
+    val photoCount = activity.selectedMedia.count { !it.isVideo }
+    val videoCount = activity.selectedMedia.count { it.isVideo }
+
+    val selectionText = when {
+        photoCount > 0 && videoCount > 0 -> "$photoCount fotoğraf, $videoCount video seçili"
+        photoCount > 0 -> "$photoCount fotoğraf seçili"
+        videoCount > 0 -> "$videoCount video seçili"
+        else -> "0 seçili"
+    }
+    
+    activity.tvSelectionCount.text = selectionText
+    activity.tvSelectionCount.textSize = 14f
+    
+    val density = activity.resources.displayMetrics.density
+    val dp8 = (8 * density).toInt()
+
+    activity.allRecycler.setPadding(dp8, 0, dp8, 0)
     
     val btnShare = activity.findViewById<View>(R.id.btnShare)
     val btnMore = activity.findViewById<View>(R.id.btnMore)
@@ -446,7 +483,6 @@ fun MainActivity.resetStates() {
 
     activity.isShowingTrash = false
     activity.isShowingFavorites = false
-    activity.isShowingPlaces = false
     activity.isShowingLocations = false
     activity.filterBucketId = null
     activity.filterLocation = null

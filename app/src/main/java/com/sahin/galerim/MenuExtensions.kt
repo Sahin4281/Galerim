@@ -385,15 +385,8 @@ fun MainActivity.showGalleryMenuBottomSheet() {
 
     var isOpeningSubMenu = false
 
-    view.findViewById<View>(R.id.menu_item_places)?.setOnClickListener {
-        currentlyPlayingPosition = -1
-        releaseMediaPlayer()
-        resetStates()
-        isShowingPlaces = true
-        bottomSheetMenu?.dismiss()
-        allRecycler.visibility = View.VISIBLE
-        albumsRecycler.visibility = View.GONE
-        loadDisplayedList()
+    view.findViewById<View>(R.id.menu_item_smart_features)?.setOnClickListener {
+        com.sahin.galerim.utils.PopupMenuHelper.showMoreMenu(this, it)
     }
 
     view.findViewById<View>(R.id.menu_item_locations)?.setOnClickListener {
@@ -451,7 +444,6 @@ fun MainActivity.showGalleryMenuBottomSheet() {
         isOpeningSubMenu = true
         isShowingTrash = false
         isShowingFavorites = false
-        isShowingPlaces = false
         isShowingLocations = false
         
         currentlyPlayingPosition = -1
@@ -484,7 +476,7 @@ fun MainActivity.showGalleryMenuBottomSheet() {
     }
 
     bottomSheetMenu?.setOnDismissListener {
-        if (!isOpeningSubMenu && !isShowingTrash && !isShowingFavorites && !isShowingPlaces && !isShowingLocations && !isSearchMode && bottomTabLayout.selectedTabPosition == 3) {
+        if (!isOpeningSubMenu && !isShowingTrash && !isShowingFavorites && !isShowingLocations && !isSearchMode && bottomTabLayout.selectedTabPosition == 3) {
             revertTabAndRestoreContext()
         }
     }
@@ -880,10 +872,7 @@ fun MainActivity.showAppearanceBottomSheet() {
         "Turkuaz" to "#00CED1",
         "Kırmızı" to "#FF5252",
         "Mor" to "#9C27B0",
-        "Yeşil" to "#4CAF50",
-        "Turuncu" to "#FF9800",
-        "Beyaz" to "#FFFFFF",
-        "Eflatun" to "#EE82EE"
+        "Yeşil" to "#4CAF50"
     )
 
     val colorScroll = android.widget.HorizontalScrollView(this).apply {
@@ -964,6 +953,67 @@ fun MainActivity.showAppearanceBottomSheet() {
         colorFrames.add(Pair(hex, frame))
         colorLayout.addView(frame)
     }
+
+    val accentPickerFrame = FrameLayout(this).apply {
+        layoutParams = LinearLayout.LayoutParams(110, 110).apply { setMargins(12, 0, 12, 0) }
+    }
+    
+    val accentPickerCircle = ImageView(this).apply {
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)).apply {
+            shape = GradientDrawable.OVAL
+        }
+        layoutParams = FrameLayout.LayoutParams(80, 80, Gravity.CENTER)
+    }
+
+    val activeAccentHex = String.format("#%06X", 0xFFFFFF and accentColor).uppercase(java.util.Locale("tr"))
+    val isFixedColor = colors.values.any { it.equals(activeAccentHex, ignoreCase = true) }
+
+    if (!isFixedColor) {
+        accentPickerFrame.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setStroke(6, accentColor)
+        }
+    }
+
+    accentPickerFrame.setOnClickListener {
+        showColorPickerDialog { selectedColor ->
+            val hexColor = String.format("#%06X", (0xFFFFFF and selectedColor))
+            prefs.edit().putString("accentColor", hexColor).apply()
+            accentColor = selectedColor
+            updateAccentColor(selectedColor)
+
+            colorFrames.forEach { (_, f) -> f.background = null }
+            accentPickerFrame.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setStroke(6, selectedColor)
+            }
+
+            val currentGrid = prefs.getInt("gridSpanCount", 4)
+            gridButtons.forEach { (col, b) ->
+                val isSel = col == currentGrid
+                val isAw = accentColor == Color.WHITE || accentColor == Color.parseColor("#FFFFFF")
+                b.setTextColor(if (isSel) { if (isAw) Color.BLACK else Color.WHITE } else primaryColor)
+                b.background = GradientDrawable().apply {
+                    cornerRadius = 30f
+                    setColor(if (isSel) accentColor else Color.parseColor("#22888888"))
+                }
+            }
+
+            val currentTheme = prefs.getString("appTheme", "Sistem Teması")
+            themeButtons.forEach { (tName, b) ->
+                val isSel = tName == currentTheme
+                val isAw = accentColor == Color.WHITE || accentColor == Color.parseColor("#FFFFFF")
+                b.setTextColor(if (isSel) { if (isAw) Color.BLACK else Color.WHITE } else primaryColor)
+                b.background = GradientDrawable().apply {
+                    cornerRadius = 30f
+                    setColor(if (isSel) accentColor else Color.parseColor("#22888888"))
+                }
+            }
+        }
+    }
+    
+    accentPickerFrame.addView(accentPickerCircle)
+    colorLayout.addView(accentPickerFrame)
 
     colorScroll.addView(colorLayout)
     layout.addView(colorScroll)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/action_faces" android:title="Kişiler" />
+    <item android:id="@+id/action_smart_categories" android:title="Akıllı Kategoriler" />
+    <item android:id="@+id/action_memories" android:title="Anılar" />
+    <item android:id="@+id/action_space_cleaner" android:title="Alan Açıcı" />
+    <item android:id="@+id/action_interactive_map" android:title="İnteraktif Harita" />
+</menu>

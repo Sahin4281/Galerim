@@ -93,6 +93,26 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <activity 
+            android:name=".SpaceCleanerActivity"
+            android:exported="false" />
+        
+        <activity 
+            android:name=".MemoriesActivity"
+            android:exported="false" />
+        
+        <activity
+            android:name=".SmartCategoriesActivity"
+            android:exported="false" />
+
+        <activity 
+            android:name=".InteractiveMapActivity"
+            android:exported="false" />
+            
+        <activity 
+            android:name=".FacesActivity"
+            android:exported="false" />
+
         <service
             android:name=".service.UrlCaptureService"
             android:exported="true"

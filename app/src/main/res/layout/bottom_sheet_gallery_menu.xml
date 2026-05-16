@@ -56,36 +56,6 @@
              android:orientation="vertical"
              android:layout_weight="1"
              android:focusable="true"
-             android:id="@+id/menu_item_places">
-
-            <ImageView
-                 android:layout_height="26dp"
-                 android:layout_width="26dp"
-                 android:src="@drawable/ic_menu_places"
-                 app:tint="@color/p_app_icon_tint" />
-
-            <TextView
-                 android:layout_height="wrap_content"
-                 android:layout_width="wrap_content"
-                 android:gravity="center"
-                 android:ellipsize="end"
-                 android:textSize="11sp"
-                 android:textColor="@color/p_app_text_primary"
-                 android:layout_marginTop="8dp"
-                 android:maxLines="1"
-                 android:text="Yerler" />
-
-        </LinearLayout>
-
-        <LinearLayout
-             android:layout_height="wrap_content"
-             android:layout_width="0dp"
-             android:background="?attr/selectableItemBackgroundBorderless"
-             android:gravity="center"
-             android:clickable="true"
-             android:orientation="vertical"
-             android:layout_weight="1"
-             android:focusable="true"
              android:id="@+id/menu_item_locations">
 
             <ImageView
@@ -164,6 +134,36 @@
                  android:layout_marginTop="8dp"
                  android:maxLines="1"
                  android:text="Çöp Kutusu" />
+
+        </LinearLayout>
+
+        <LinearLayout
+             android:layout_height="wrap_content"
+             android:layout_width="0dp"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:gravity="center"
+             android:clickable="true"
+             android:orientation="vertical"
+             android:layout_weight="1"
+             android:focusable="true"
+             android:id="@+id/menu_item_smart_features">
+
+            <ImageView
+                 android:layout_height="26dp"
+                 android:layout_width="26dp"
+                 android:src="@drawable/ic_smart_bulb"
+                 app:tint="@color/p_app_icon_tint" />
+
+            <TextView
+                 android:layout_height="wrap_content"
+                 android:layout_width="wrap_content"
+                 android:gravity="center"
+                 android:ellipsize="end"
+                 android:textSize="11sp"
+                 android:textColor="@color/p_app_text_primary"
+                 android:layout_marginTop="8dp"
+                 android:maxLines="1"
+                 android:text="Akıllı İşlemler" />
 
         </LinearLayout>
 

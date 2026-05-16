@@ -975,43 +975,64 @@ fun modifyVideoLocationWithMuxer(sourceFile: File, tempFile: File, lat: Double?,
     }
 }
 
-fun MainActivity.renameMediaFile(item: MediaItem, newNameWithExt: String) {
+fun MainActivity.renameMediaFile(item: MediaItem, newName: String) {
     showNoIconToast("Yeniden isimlendiriliyor...")
     lifecycleScope.launch(Dispatchers.IO) {
         try {
             val sourceFile = File(item.path)
-            val destFile = File(sourceFile.parentFile, newNameWithExt)
+            val ext = sourceFile.extension
+            
+            val finalName = if (ext.isNotEmpty() && !newName.endsWith(".$ext", true)) {
+                "$newName.$ext"
+            } else {
+                newName
+            }
+            
+            val destFile = File(sourceFile.parentFile, finalName)
             
             if (sourceFile.exists() && !destFile.exists()) {
-                if (sourceFile.renameTo(destFile)) {
+                var success = false
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     try {
                         val values = ContentValues().apply {
-                            put(MediaStore.MediaColumns.DISPLAY_NAME, newNameWithExt)
-                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                                put(MediaStore.MediaColumns.DATA, destFile.absolutePath)
-                            }
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, finalName)
                         }
-                        contentResolver.update(item.uri, values, null, null)
+                        val updated = contentResolver.update(item.uri, values, null, null)
+                        if (updated > 0) {
+                            success = true
+                        }
                     } catch (e: Exception) {
-                        try { contentResolver.delete(item.uri, null, null) } catch (e2: Exception) {}
                     }
-                    
+                }
+                
+                if (!success) {
+                    if (sourceFile.renameTo(destFile)) {
+                        success = true
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                            try { contentResolver.delete(item.uri, null, null) } catch (e: Exception) {}
+                        }
+                    }
+                }
+                
+                if (success) {
                     android.media.MediaScannerConnection.scanFile(this@renameMediaFile, arrayOf(destFile.absolutePath), null, null)
-                    
-                    withContext(Dispatchers.Main) {
+                    android.os.SystemClock.sleep(800)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    if (success) {
                         showNoIconToast("Yeniden isimlendirildi")
                         exitSelectionMode()
                         MainActivity.forceReload = true
                         loadAllMedia()
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
+                    } else {
                         showNoIconToast("İsim değiştirilemedi")
                     }
                 }
             } else {
                 withContext(Dispatchers.Main) {
-                    showNoIconToast("Bu isimde bir dosya zaten var")
+                    showNoIconToast("Bu isimde bir dosya zaten var veya dosya bulunamadı")
                 }
             }
         } catch (e: Exception) {
