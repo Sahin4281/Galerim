@@ -568,6 +568,7 @@ class MainActivity : AppCompatActivity() {
         topIconsContainer.visibility = View.VISIBLE
         
         loadDisplayedList()
+        applyDynamicColorsToUI()
     }
 
     fun updateAlbumSelectionUI() {

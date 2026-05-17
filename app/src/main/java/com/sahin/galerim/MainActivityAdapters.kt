@@ -542,6 +542,9 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
                 activity.coordinatorLayout.visibility = View.VISIBLE
                 activity.allRecycler.visibility = View.VISIBLE
 
+                val appBar = activity.findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBarLayout)
+                appBar?.setExpanded(true, false)
+
                 var photoCount = 0
                 var videoCount = 0
                 MainActivity.displayedMediaList.forEach { if (it.isVideo) videoCount++ else photoCount++ }
@@ -551,7 +554,6 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
                 if (videoCount > 0) subtitleParts.add("$videoCount video")
                 val subText = subtitleParts.joinToString(", ")
 
-                val appBar = activity.findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBarLayout)
                 val collapsingToolbar = appBar?.getChildAt(0) as? com.google.android.material.appbar.CollapsingToolbarLayout
                 val params = collapsingToolbar?.layoutParams as? com.google.android.material.appbar.AppBarLayout.LayoutParams
                 if (params != null) {
@@ -559,21 +561,29 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
                     collapsingToolbar.layoutParams = params
                 }
 
-                activity.findViewById<LinearLayout>(R.id.albumStickyHeader)?.visibility = View.VISIBLE
+                val stickyHeader = activity.findViewById<LinearLayout>(R.id.albumStickyHeader)
+                stickyHeader?.visibility = View.VISIBLE
+                stickyHeader?.alpha = 1f
                 
                 activity.mainTitle.text = displayName
+                activity.mainTitle.setTextColor(adaptiveTextColor)
                 activity.mainTitle.visibility = View.VISIBLE
+                activity.mainTitle.alpha = 1f
                 
                 val subTitleView = activity.findViewById<TextView>(R.id.subTitle)
                 subTitleView?.text = subText
+                subTitleView?.setTextColor(adaptiveTextColor)
+                subTitleView?.alpha = 1f
                 
                 activity.topIconsContainer.visibility = View.VISIBLE
+                activity.topIconsContainer.alpha = 1f
+                
                 val iconGroup = activity.topIconsContainer as? ViewGroup
                 iconGroup?.removeAllViews()
                 
                 val moreIcon = ImageView(activity).apply {
                     setImageResource(R.drawable.ic_action_more)
-                    setColorFilter(ContextCompat.getColor(activity, R.color.p_app_icon_tint))
+                    setColorFilter(adaptiveTextColor)
                     val pad = (12 * activity.resources.displayMetrics.density).toInt()
                     setPadding(pad, pad, pad, pad)
                     layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -589,6 +599,8 @@ class AlbumsAdapter(private val activity: MainActivity) : RecyclerView.Adapter<A
                     }
                 }
                 iconGroup?.addView(moreIcon)
+                
+                activity.applyDynamicColorsToUI()
 
             } catch (e: Exception) {
                 e.printStackTrace()

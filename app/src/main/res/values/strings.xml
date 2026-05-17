@@ -9,7 +9,7 @@
     <string name="menu_home">Home</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
-    <string name="app_name">galerim</string>
+    <string name="app_name">1 Galeri</string>
     <string name="accessibility_service_description">Bu hizmet, ekran görüntüsü aldığınızda web adresini kaydederek galeride \"Web Sitesine Git\" butonunun çıkmasını sağlar. Hiçbir kişisel veri toplanmaz veya paylaşılmaz.</string>
     <string name="accessibility_service_label">Galerim URL Yakalama</string>
 

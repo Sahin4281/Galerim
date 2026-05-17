@@ -214,6 +214,8 @@
             <com.google.android.material.appbar.CollapsingToolbarLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                app:contentScrim="@android:color/transparent"
+                app:statusBarScrim="@android:color/transparent"
                 app:layout_scrollFlags="scroll|enterAlways">
 
                 <LinearLayout

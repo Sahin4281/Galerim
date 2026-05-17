@@ -1,10 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
   <style name="Base.AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
     <item name="popupMenuStyle">@style/CustomPopupMenuStyle</item>
     <item name="android:popupMenuStyle">@style/CustomPopupMenuStyle</item>
+    <item name="android:statusBarColor">@color/p_app_background</item>
   </style>
 
-  <style name="AppTheme" parent="Base.AppTheme" />
+  <style name="AppTheme" parent="Base.AppTheme">
+    <item name="android:windowLightStatusBar">false</item>
+  </style>
+
+  <style name="Theme.App.Launcher" parent="Base.AppTheme">
+    <item name="android:windowLightStatusBar">false</item>
+  </style>
 
   <style name="CustomPopupMenuStyle" parent="@android:style/Widget.PopupMenu">
     <item name="android:popupBackground">@drawable/popup_menu_background</item>

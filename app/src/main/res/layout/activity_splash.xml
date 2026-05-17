@@ -8,7 +8,7 @@
     <ImageView
          android:layout_height="match_parent"
          android:layout_width="match_parent"
-         android:src="@drawable/splash_tam"
+         android:src="@mipmap/ic_launcher"
          android:scaleType="centerCrop"
          android:id="@+id/splashLogo" />
 

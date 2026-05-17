@@ -157,14 +157,24 @@ fun MainActivity.applyDynamicColorsToUI() {
     activity.selectionBottomBar.setBackgroundColor(dynamicBarColor)
     activity.bottomTabLayout.setBackgroundColor(dynamicBarColor)
     
-    activity.mainTitle.setTextColor(adaptiveTextColor)
-    activity.findViewById<TextView>(R.id.subTitle)?.setTextColor(adaptiveSecondaryColor)
+    activity.findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBarLayout)?.setBackgroundColor(dynamicBarColor)
+    
+    val albumStickyHeader = activity.findViewById<View>(R.id.albumStickyHeader)
+    val headerTextColor = adaptiveTextColor
+    val headerSecondaryColor = adaptiveSecondaryColor
+
+    if (albumStickyHeader != null && albumStickyHeader.visibility == View.VISIBLE) {
+        albumStickyHeader.setBackgroundColor(dynamicBarColor)
+    }
+
+    activity.mainTitle.setTextColor(headerTextColor)
+    activity.findViewById<TextView>(R.id.subTitle)?.setTextColor(headerSecondaryColor)
     
     (activity.topIconsContainer as? ViewGroup)?.let { container ->
         for (i in 0 until container.childCount) {
             val child = container.getChildAt(i)
             if (child is ImageView) {
-                child.setColorFilter(adaptiveTextColor)
+                child.setColorFilter(headerTextColor)
             }
         }
     }
@@ -774,3 +784,4 @@ fun removeTempFileFromCleanup(context: Context, path: String) {
     list.remove(path)
     prefs.edit().putString("pending_temp_files", list.joinToString("|")).apply()
 }
+

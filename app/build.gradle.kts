@@ -38,6 +38,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -73,7 +74,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.2.0")
     implementation("com.googlecode.mp4parser:isoparser:1.1.22")
-    
     implementation("com.google.mlkit:face-detection:16.1.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.6.4")
 }
